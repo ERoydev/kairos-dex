@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 
 #[constant]
-pub const COUNTER_SEED: &[u8] = b"counter";
+pub const LIQUIDITY_POOL_SEED: &[u8] = b"liquidity_pool";
 
 #[constant]
-pub const HELLO_WORLD_LAMPORTS: u64 = 1;
+pub const POOL_VERSION: u8 = 1;
 
 #[constant]
-pub const MAX_COUNT: u64 = 10;
+pub const USDC_VAULT_SEED: &[u8] = b"usdc_vault";

@@ -7,7 +7,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-liquidity_pool = "86Pd3Qq2TTuakU85RH6knQC1tBU2NiZDhHLuKjq55Hdi"
+liquidity_pool = "4ZuUyESpBpUfAYperMNg9h6uzKMCNjfL47RsNfD3TnLL"
 
 [provider]
 cluster = "localnet"

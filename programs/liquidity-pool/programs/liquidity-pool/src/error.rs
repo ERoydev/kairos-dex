@@ -6,4 +6,7 @@ pub enum ErrorCode {
     Unauthorized,
     #[msg("Counter has reached the maximum value")]
     CounterOverflow,
+    #[msg("Invalid pool version")]
+    InvalidPoolVersion,
+    
 }
