@@ -12,7 +12,7 @@ use {
     solana_transaction::versioned::VersionedTransaction,
 };
 
-use liquidity_pool::{Pool, USDC_VAULT_SEED};
+use liquidity_pool::{Pool, USDC_VAULT_SEED, LP_MINT_SEED};
 use litesvm_token::CreateMint;
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 
@@ -24,6 +24,7 @@ fn make_initialize_pool_ix(
     payer: Pubkey,
     usdc_mint: Pubkey,
     usdc_vault: Pubkey,
+    lp_mint: Pubkey,
 ) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
@@ -33,6 +34,7 @@ fn make_initialize_pool_ix(
             authority: payer,
             usdc_mint,
             usdc_vault,
+            lp_mint,
             token_program: anchor_spl::token::ID,
             system_program: system_program::ID,
         }
@@ -54,8 +56,9 @@ fn test_initialize_pool() {
     let (pool, _) = Pubkey::find_program_address(&[liquidity_pool::constants::LIQUIDITY_POOL_SEED], &program_id);
     let usdc_mint = CreateMint::new(&mut svm, &payer).authority(&payer.pubkey()).decimals(USDC_DECIMALS).send().unwrap();
     let (usdc_vault, _) = Pubkey::find_program_address(&[USDC_VAULT_SEED], &program_id);
+    let (lp_mint, _) = Pubkey::find_program_address(&[LP_MINT_SEED], &program_id);
 
-    let ix = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault);
+    let ix = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault, lp_mint);
     let blockhash = svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&payer.pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer]).unwrap();
@@ -89,14 +92,15 @@ fn test_initialize_pool_already_exists() {
     let (pool, _) = Pubkey::find_program_address(&[liquidity_pool::constants::LIQUIDITY_POOL_SEED], &program_id);
     let usdc_mint = CreateMint::new(&mut svm, &payer).authority(&payer.pubkey()).decimals(USDC_DECIMALS).send().unwrap();
     let (usdc_vault, _) = Pubkey::find_program_address(&[USDC_VAULT_SEED], &program_id);
+    let (lp_mint, _) = Pubkey::find_program_address(&[LP_MINT_SEED], &program_id);
 
-    let ix = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault);
+    let ix = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault, lp_mint);
     let blockhash = svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&payer.pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer]).unwrap();
     svm.send_transaction(tx).unwrap();
 
-    let ix2 = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault);
+    let ix2 = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault, lp_mint);
     let blockhash = svm.latest_blockhash();
     let msg2 = Message::new_with_blockhash(&[ix2], Some(&payer.pubkey()), &blockhash);
     let tx2 = VersionedTransaction::try_new(VersionedMessage::Legacy(msg2), &[&payer]).unwrap();
