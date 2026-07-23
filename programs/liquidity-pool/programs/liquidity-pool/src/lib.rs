@@ -18,4 +18,8 @@ pub mod liquidity_pool {
     pub fn initialize_pool(ctx: Context<InitializePool>) -> Result<()> {
         _initialize_pool(ctx)
     }
+
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        _deposit(ctx, amount)
+    }
 }
