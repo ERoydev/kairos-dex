@@ -22,4 +22,12 @@ pub mod liquidity_pool {
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         _deposit(ctx, amount)
     }
+
+    pub fn withdraw(ctx: Context<Withdraw>, lp_amount: u64) -> Result<()> {
+        _withdraw(ctx, lp_amount)
+    }
+
+    pub fn credit(ctx: Context<Credit>, amount: u64) -> Result<()> {
+        _credit(ctx, amount)
+    }
 }

@@ -8,5 +8,6 @@ pub enum ErrorCode {
     CounterOverflow,
     #[msg("Invalid pool version")]
     InvalidPoolVersion,
-    
+    #[msg("Pool has no shares outstanding")]
+    ZeroShares,
 }
