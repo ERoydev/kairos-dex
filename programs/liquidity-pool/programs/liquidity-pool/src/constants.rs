@@ -1,10 +1,9 @@
 use anchor_lang::prelude::*;
 
-#[constant]
-pub const LIQUIDITY_POOL_SEED: &[u8] = b"liquidity_pool";
+// --- SEEDS
 
 #[constant]
-pub const POOL_VERSION: u8 = 1;
+pub const LIQUIDITY_POOL_SEED: &[u8] = b"liquidity_pool";
 
 #[constant]
 pub const USDC_VAULT_SEED: &[u8] = b"usdc_vault";
@@ -12,8 +11,15 @@ pub const USDC_VAULT_SEED: &[u8] = b"usdc_vault";
 #[constant]
 pub const LP_MINT_SEED: &[u8] = b"lp_mint";
 
+// --- Numerical constants
+
+#[constant]
+pub const POOL_VERSION: u8 = 1;
+
 #[constant]
 pub const DEFAULT_DECIMALS: u8 = 6;
+
+// --- Addresses constants
 
 #[constant]
 #[cfg(feature = "dev")]

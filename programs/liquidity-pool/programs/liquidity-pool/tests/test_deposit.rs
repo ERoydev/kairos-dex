@@ -11,10 +11,12 @@ use solana_message::{Message, VersionedMessage};
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
+use anchor_lang::pubkey;
 
 use liquidity_pool::{Pool, LP_MINT_SEED, USDC_VAULT_SEED};
 
 const USDC_DECIMALS: u8 = 6;
+const FAKE_PERP_PROGRAM: Pubkey = pubkey!("11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs");
 
 fn make_initialize_pool_ix(
     program_id: Pubkey,
@@ -23,6 +25,7 @@ fn make_initialize_pool_ix(
     usdc_mint: Pubkey,
     usdc_vault: Pubkey,
     lp_mint: Pubkey,
+    perp_program: Pubkey,
 ) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
@@ -33,6 +36,7 @@ fn make_initialize_pool_ix(
             usdc_mint,
             usdc_vault,
             lp_mint,
+            perp_program,
             token_program: anchor_spl::token::ID,
             system_program: system_program::ID,
         }
@@ -110,7 +114,7 @@ fn test_deposit() {
 
     // Initialize the pool.
     let blockhash = svm.latest_blockhash();
-    let init_ix = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault, lp_mint);
+    let init_ix = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault, lp_mint, FAKE_PERP_PROGRAM);
     let msg = Message::new_with_blockhash(&[init_ix], Some(&payer.pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer]).unwrap();
     svm.send_transaction(tx).unwrap();

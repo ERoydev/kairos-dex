@@ -10,4 +10,6 @@ pub enum ErrorCode {
     InvalidPoolVersion,
     #[msg("Pool has no shares outstanding")]
     ZeroShares,
+    #[msg("Pool has insufficient funds to cover payout")]
+    InsufficientFunds,
 }

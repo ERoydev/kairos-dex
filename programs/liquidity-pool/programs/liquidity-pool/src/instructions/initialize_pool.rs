@@ -13,6 +13,7 @@ pub fn _initialize_pool(ctx: Context<InitializePool>) -> Result<()> {
     pool.version = POOL_VERSION;
     pool.bump = ctx.bumps.pool;
     pool.authority = ctx.accounts.authority.key();
+    pool.perp_program = ctx.accounts.perp_program.key();
     pool.usdc_mint = ctx.accounts.usdc_mint.key();
     pool.usdc_vault = ctx.accounts.usdc_vault.key();
     pool.lp_mint = ctx.accounts.lp_mint.key();
@@ -66,6 +67,9 @@ pub struct InitializePool<'info> {
         bump
     )]
     pub lp_mint: Account<'info, Mint>,
+
+    /// CHECK: perp program ID stored for CPI access control
+    pub perp_program: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,

@@ -7,7 +7,8 @@ pub struct Pool {
     pub bump: u8,                 // PDA bump seed
 
     // --- Admin ---
-    pub authority: Pubkey,        // who can update config
+    pub authority: Pubkey,        // Admin, controls config
+    pub perp_program: Pubkey,     // Perp program address, can perform CPI for credit/debit
 
     // --- Asset config ---
     pub usdc_mint: Pubkey,        // which token the pool holds (USDC)
@@ -26,6 +27,7 @@ impl Pool {
     pub const SIZE: usize =
         std::mem::size_of::<u8>() +
         std::mem::size_of::<u8>() +
+        std::mem::size_of::<Pubkey>() +
         std::mem::size_of::<Pubkey>() +
         std::mem::size_of::<Pubkey>() +
         std::mem::size_of::<Pubkey>() +
