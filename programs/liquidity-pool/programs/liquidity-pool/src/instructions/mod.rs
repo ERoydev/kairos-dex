@@ -9,3 +9,6 @@ pub use withdraw::*;
 
 pub mod credit;
 pub use credit::*;
+
+pub mod debit;
+pub use debit::*;

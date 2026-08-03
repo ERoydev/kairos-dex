@@ -30,4 +30,8 @@ pub mod liquidity_pool {
     pub fn credit(ctx: Context<Credit>, amount: u64) -> Result<()> {
         _credit(ctx, amount)
     }
+
+    pub fn debit(ctx: Context<Debit>, amount: u64) -> Result<()> {
+        _debit(ctx, amount)
+    }
 }

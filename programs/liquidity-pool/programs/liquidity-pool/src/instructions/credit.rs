@@ -8,14 +8,18 @@ use crate::state::pool::Pool;
 use crate::constants::{LIQUIDITY_POOL_SEED, USDC_VAULT_SEED};
 use crate::error::ErrorCode;
 
-/// Perp contract CPIs here when the pool gains USDC (trader loses / fees collected).
+
+// Credit (trader loses): perp pushes USDC → pool vault, pool PDA is not the signer.
+// Trader loses → the pool collects their loss as profit → credit the pool (money flows IN)
+
 pub fn _credit(ctx: Context<Credit>, amount: u64) -> Result<()> {
     let caller = &ctx.accounts.caller;
     let pool = &ctx.accounts.pool;
     let token_program = &ctx.accounts.token_program;
+    let perp_program = pool.perp_program;
 
-    // Only the pool authority (replaced with perp program PDA once wired)
-    require!(caller.key() == pool.authority, ErrorCode::Unauthorized);
+    // Only the pool program can call this via CPI
+    require!(caller.key() == perp_program, ErrorCode::Unauthorized);
 
     let transfer_cpi = CpiContext::new(
         token_program.key(),
