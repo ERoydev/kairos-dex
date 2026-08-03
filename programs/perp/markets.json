@@ -1,0 +1,29 @@
+[
+  {
+    "symbol": "BTC-PERP",
+    "oracle": "GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU",
+    "max_leverage": 20,
+    "max_open_interest": 5000000000000,
+    "maintenance_margin_bps": 500,
+    "open_fee_bps": 10,
+    "close_fee_bps": 10
+  },
+  {
+    "symbol": "ETH-PERP",
+    "oracle": "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB",
+    "max_leverage": 20,
+    "max_open_interest": 3000000000000,
+    "maintenance_margin_bps": 500,
+    "open_fee_bps": 10,
+    "close_fee_bps": 10
+  },
+  {
+    "symbol": "SOL-PERP",
+    "oracle": "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG",
+    "max_leverage": 10,
+    "max_open_interest": 1000000000000,
+    "maintenance_margin_bps": 750,
+    "open_fee_bps": 10,
+    "close_fee_bps": 10
+  }
+]
