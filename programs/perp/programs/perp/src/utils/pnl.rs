@@ -1,16 +1,10 @@
+use crate::position::PositionType;
 
-// TODO
-pub enum Side {
-    Long,
-    Short,
-}
 
 /// Computes PnL in USDC (same precision as `size`/`margin`) for a position.
 /// `size` is the notional exposure in USDC, entry/exit prices share the same decimals.
-/// long -> (exit_price - entry_price) * size / entry_price;
-/// short -> (entry_price - exit_price) * size / entry_price;
 pub fn calculate_pnl(
-    side: Side,
+    side: PositionType,
     entry_price: u64,
     exit_price: u64,
     size: u64,
@@ -18,13 +12,13 @@ pub fn calculate_pnl(
     let entry = entry_price as i128;
     let exit = exit_price as i128;
     let size = size as i128;
- 
+    
+    // pnl = (exit - entry) * size_usdc / entry,  reversed on `Short`
     let price_diff = match side {
-        Side::Long => exit - entry,
-        Side::Short => entry - exit,
+        PositionType::Long => exit - entry,
+        PositionType::Short => entry - exit,
     };
  
-    // pnl = price_diff * size / entry_price
     let pnl = price_diff * size / entry;
     pnl as i64
 }
@@ -47,5 +41,49 @@ pub fn settle(margin: u64, pnl: i64, fee: u64) -> (u64, u64, u64) {
     } else {
         // trader loses everything, margin fully absorbed by pool
         (0, margin, 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{assert_eq};
+    use super::*;
+
+    #[test]
+    fn test_calculate_pnl_long() {
+        // Working with micro-USDC
+        let entry_price: u64 = 73_485_100; // 73.4851 USDC
+        let take_profit_exit_price = 75_000_000; // 75 USDC
+        let stop_loss_exit_price = 71_000_000;
+        let size = 40_000_000 - 40_000; // size - fees(0.04)
+        let side1 = PositionType::Long;
+
+        let expected_take_profit_pnl = 823777; // 823777 / 1000000 `10^6` = $0.82, roi=(+4.12%)  
+        let expected_loss_exit_price = -1351356;
+        
+        let pnl_take_profit = calculate_pnl(side1, entry_price, take_profit_exit_price, size);
+        let pnl_stop_loss = calculate_pnl(side1, entry_price, stop_loss_exit_price, size);
+
+        assert_eq!(pnl_take_profit, expected_take_profit_pnl, "Errror");
+        assert_eq!(pnl_stop_loss, expected_loss_exit_price, "Should be correct");
+    }
+
+    #[test]
+    fn test_calculate_pnl_short() {
+        // Working with micro-USDC
+        let entry_price: u64 = 73_485_100; // 73.4851 USDC
+        let take_profit_exit_price = 71_000_000;
+        let stop_loss_exit_price = 75_000_000;   
+        let size = 40_000_000 - 40_000; 
+        let side = PositionType::Short;
+
+        let expected_take_profit_pnl = 1_351_356;  
+        let expected_stop_loss_pnl = -823_777;   
+
+        let pnl_take_profit = calculate_pnl(side, entry_price, take_profit_exit_price, size);
+        let pnl_stop_loss = calculate_pnl(side, entry_price, stop_loss_exit_price, size);
+
+        assert_eq!(pnl_take_profit, expected_take_profit_pnl, "Short take profit wrong");
+        assert_eq!(pnl_stop_loss, expected_stop_loss_pnl, "Short stop loss wrong");
     }
 }

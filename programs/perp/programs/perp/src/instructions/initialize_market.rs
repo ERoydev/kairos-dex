@@ -17,8 +17,8 @@ pub fn _initialize_market(ctx: Context<InitializeMarket>, symbol: [u8; 16], conf
     market.oracle = ctx.accounts.oracle.key();
     market.max_leverage = config.max_leverage;
     market.max_open_interest = config.max_open_interest;
-    market.open_interest_long = config.open_interest_long;
-    market.open_interest_short = config.open_interest_short;
+    market.open_interest_long = 0;
+    market.open_interest_short = 0;
 
     market.maintenance_margin_bps = config.mmr_bps;
     market.open_fee_bps = config.open_fee_bps;
@@ -68,16 +68,12 @@ pub struct InitializeMarket<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// TODO: Maybe i need to adjust some formulas so for example open_long_interest and open_fee_bps can be adjusted dynamically on trader positions
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct MConfig {
     pub max_leverage: u64,
     pub max_open_interest: u64,
-
-    pub open_interest_long: u64,
-    pub open_interest_short: u64,
-
     pub mmr_bps: u64,
-
     pub open_fee_bps: u64,
     pub close_fee_bps: u64,
 }
