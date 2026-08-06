@@ -3,7 +3,6 @@
     "symbol": "BTC-PERP",
     "oracle": "4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo",
     "max_leverage": 20,
-    "max_open_interest": 500000000000,
     "maintenance_margin_bps": 100,
     "open_fee_bps": 10,
     "close_fee_bps": 10,

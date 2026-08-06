@@ -1,3 +1,3 @@
 pub mod position;
-pub mod market;
+pub mod syntetic_market;
 pub mod global;

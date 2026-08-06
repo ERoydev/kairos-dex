@@ -58,7 +58,6 @@ fn main() {
 
         let config = perp::types::MConfig {
             max_leverage: market_cfg.max_leverage,
-            max_open_interest: market_cfg.max_open_interest,
             mmr_bps: market_cfg.maintenance_margin_bps,
             open_fee_bps: market_cfg.open_fee_bps,
             close_fee_bps: market_cfg.close_fee_bps,

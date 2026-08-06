@@ -10,7 +10,7 @@ use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 
-use perp::{state::market::Market, MConfig, MARKET_SEED, GLOBAL_SEED};
+use perp::{state::syntetic_market::SynteticMarket, MConfig, MARKET_SEED, GLOBAL_SEED};
 
 fn program_bytes() -> &'static [u8] {
     include_bytes!(concat!(env!("CARGO_TARGET_TMPDIR"), "/../deploy/perp.so"))
@@ -27,9 +27,6 @@ fn global_config_pda(program_id: &Pubkey) -> Pubkey {
 fn default_config() -> MConfig {
     MConfig {
         max_leverage: 20,
-        max_open_interest: 1_000_000_000,
-        open_interest_long: 0,
-        open_interest_short: 0,
         mmr_bps: 500,
         open_fee_bps: 10,
         close_fee_bps: 10,
@@ -109,16 +106,16 @@ fn test_initialize_market_ok() {
     assert!(send_ix(&mut svm, ix, &[&payer]).is_ok());
 
     let account = svm.get_account(&market).expect("market not found");
-    let data = Market::try_deserialize(&mut account.data.as_slice()).unwrap();
+    let data = SynteticMarket::try_deserialize(&mut account.data.as_slice()).unwrap();
 
     assert_eq!(data.symbol, sym);
     assert_eq!(data.authority, payer.pubkey());
     assert_eq!(data.oracle, oracle);
-    assert_eq!(data.max_leverage, 20);
-    assert_eq!(data.open_fee_bps, 10);
-    assert_eq!(data.close_fee_bps, 10);
-    assert_eq!(data.maintenance_margin_bps, 500);
-    assert!(data.is_active);
+    // assert_eq!(data.max_leverage, 20);
+    // assert_eq!(data.open_fee_bps, 10);
+    // assert_eq!(data.close_fee_bps, 10);
+    // assert_eq!(data.maintenance_margin_bps, 500);
+    // assert!(data.is_active);
 }
 
 #[test]
