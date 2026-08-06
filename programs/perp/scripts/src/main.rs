@@ -1,4 +1,3 @@
-
 use anchor_client::{Client, Cluster, Signer};
 use anchor_lang::prelude::*;
 use serde::Deserialize;
@@ -29,7 +28,8 @@ fn symbol_to_bytes(s: &str) -> [u8; 16] {
 
 fn main() {
     dotenv::from_path("../.env").ok();
-    let private_key = env::var("ADMIN_PHANTOM_PRIVATE_KEY").expect("ADMIN_PHANTOM_PRIVATE_KEY not set");
+    let private_key =
+        env::var("ADMIN_PHANTOM_PRIVATE_KEY").expect("ADMIN_PHANTOM_PRIVATE_KEY not set");
     let payer = Rc::new(Keypair::from_base58_string(&private_key));
 
     let client = Client::new(Cluster::Devnet, Rc::clone(&payer));
@@ -39,8 +39,8 @@ fn main() {
 
     let markets_json = std::fs::read_to_string("../config/markets.json")
         .expect("Failed to read config/markets.json");
-    let markets: Vec<MarketConfig> = serde_json::from_str(&markets_json)
-        .expect("Failed to parse markets.json");
+    let markets: Vec<MarketConfig> =
+        serde_json::from_str(&markets_json).expect("Failed to parse markets.json");
 
     for mut market_cfg in markets {
         let symbol = symbol_to_bytes(&market_cfg.symbol);
@@ -49,11 +49,16 @@ fn main() {
 
         // Skip if already initialized on-chain
         if program.rpc().get_account(&market_pda).is_ok() {
-            println!("Market {} already initialized, skipping.", market_cfg.symbol);
+            println!(
+                "Market {} already initialized, skipping.",
+                market_cfg.symbol
+            );
             continue;
         }
 
-        let oracle_pubkey: Pubkey = market_cfg.oracle.parse()
+        let oracle_pubkey: Pubkey = market_cfg
+            .oracle
+            .parse()
             .unwrap_or_else(|_| panic!("Invalid oracle pubkey for {}", market_cfg.symbol));
 
         let config = perp::types::MConfig {
@@ -72,10 +77,7 @@ fn main() {
                 oracle: oracle_pubkey,
                 system_program: anchor_lang::system_program::ID,
             })
-            .args(perp::client::args::InitializeMarket {
-                symbol,
-                config,
-            })
+            .args(perp::client::args::InitializeMarket { symbol, config })
             .send()
             .unwrap_or_else(|e| panic!("Failed to initialize market {}: {e}", market_cfg.symbol));
 

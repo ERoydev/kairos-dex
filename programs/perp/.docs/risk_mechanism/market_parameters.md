@@ -30,7 +30,7 @@ These react to volatility, solvency, oracle health — not just pool size:
 
 ## Rarely touched
 
-- `maintenance_margin_ratio`
+- `maintenance_margin_bps`
 - `fee_schedule (base fees)`
 - `max_oracle_staleness`
 - `max_oracle_deviation_bps`
