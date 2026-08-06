@@ -38,3 +38,4 @@ F_i = funding_fee_at_time_i/long_open_interest_at_time_i
 
 2. side that is going to claim this funding fee, this results in amount of funding fee that shorts can claim per position size at time i
 C_i = funding_fee_at_time_i/short_open_interest_at_time_i
+asdadsa
