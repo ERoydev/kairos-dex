@@ -15,5 +15,5 @@ pub enum PerpError {
     #[msg("Math operation resulted in overflow or underflow")]
     MathOverflow,
     #[msg("Funding too early")]
-    FundingTooEarly
+    FundingTooEarly,
 }

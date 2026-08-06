@@ -8,7 +8,6 @@ pub const MARKET_VERSION: u8 = 1;
 #[constant]
 pub const DEFAULT_DECIMALS: u8 = 6;
 
-
 // --- Numerical constants
 
 #[constant]

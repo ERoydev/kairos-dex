@@ -1,8 +1,21 @@
+use crate::{
+    error::PerpError,
+    events::MarketInitialized,
+    state::global::GlobalConfig,
+    syntetic_market::{
+        FeeSchedule, FundingConfig, FundingFees, RiskManagementParameters, SynteticMarket,
+    },
+    utils::caps::compute_caps,
+    GLOBAL_SEED, MARKET_SEED, MARKET_VERSION,
+};
 use anchor_lang::prelude::*;
-use crate::{error::PerpError, events::MarketInitialized, state::global::GlobalConfig, syntetic_market::{FeeSchedule, FundingConfig, FundingFees, RiskManagementParameters, SynteticMarket, TvlScaledCaps}, utils::caps::compute_caps, GLOBAL_SEED, MARKET_SEED, MARKET_VERSION};
 
 // Admin instruction
-pub fn _initialize_market(ctx: Context<InitializeMarket>, symbol: [u8; 16], config: SMParams) -> Result<()> {
+pub fn _initialize_market(
+    ctx: Context<InitializeMarket>,
+    symbol: [u8; 16],
+    config: SMParams,
+) -> Result<()> {
     require!(config.max_leverage > 0, PerpError::InvalidConfig);
     require!(config.mmr_bps < 10_000, PerpError::InvalidConfig);
 
@@ -15,7 +28,7 @@ pub fn _initialize_market(ctx: Context<InitializeMarket>, symbol: [u8; 16], conf
     market.authority = ctx.accounts.payer.key();
     market.symbol = symbol;
     market.oracle = ctx.accounts.oracle.key();
-    
+
     // runtime state
     market.oi_long = 0;
     market.oi_short = 0;
@@ -26,9 +39,9 @@ pub fn _initialize_market(ctx: Context<InitializeMarket>, symbol: [u8; 16], conf
         max_leverage: config.max_leverage,
         maintenance_margin_bps: config.mmr_bps,
         fee_schedule: FeeSchedule::default(),
-        caps: compute_caps(mock_lp_tvl)
+        caps: compute_caps(mock_lp_tvl),
     };
-    
+
     market.funding_config = FundingConfig::default();
 
     market.is_active = true;
@@ -39,17 +52,16 @@ pub fn _initialize_market(ctx: Context<InitializeMarket>, symbol: [u8; 16], conf
         authority: ctx.accounts.payer.key(),
     });
 
-
     Ok(())
 }
 
 #[derive(Accounts)]
-#[instruction(symbol: [u8; 16])] 
+#[instruction(symbol: [u8; 16])]
 pub struct InitializeMarket<'info> {
     #[account(
         mut,
         // ANCHOR: Only Global Admin can call this instruction
-        constraint = payer.key() == global_config.authority @ PerpError::Unauthorized 
+        constraint = payer.key() == global_config.authority @ PerpError::Unauthorized
     )]
     pub payer: Signer<'info>,
 
@@ -75,7 +87,6 @@ pub struct InitializeMarket<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// TODO: Maybe i need to adjust some formulas so for example open_long_interest and open_fee_bps can be adjusted dynamically on trader positions
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct SMParams {
     pub max_leverage: u16,

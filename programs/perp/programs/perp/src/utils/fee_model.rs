@@ -6,14 +6,12 @@ Paid at open → already deducted from collateral before position exists.
 Paid at close → applied when user closes, doesn't affect liquidation trigger.
 */
 
-
 /// fee_bps: fee in basis points (1 bps = 0.01%). e.g. 10 = 0.10%
 /// size: notional position size in USDC base units
 /// returns: fee amount in USDC base units
 pub fn calculate_base_fee(size: MicroUsdc, fee_bps: MicroUsdc) -> MicroUsdc {
     (size as u128 * fee_bps as u128 / 10_000) as u64
 }
-
 
 pub fn calculate_trade_fee(
     notional: MicroUsdc,
@@ -54,8 +52,5 @@ mod tests {
     use super::*;
 
     #[test]
-    pub fn fee_model_test() {
-        
-    }
-
+    pub fn fee_model_test() {}
 }

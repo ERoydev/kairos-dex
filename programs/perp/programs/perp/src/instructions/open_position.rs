@@ -1,8 +1,12 @@
 use anchor_lang::prelude::*;
 
-use crate::{POSITION_SEED, syntetic_market::SynteticMarket, position::{Position, PositionType}};
+use crate::{
+    position::{Position, PositionType},
+    syntetic_market::SynteticMarket,
+    POSITION_SEED,
+};
 
-pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) -> Result<()> {
+pub fn _open_position(_ctx: Context<OpenPosition>, _o_params: OpenPositionParams) -> Result<()> {
     // TODO: Validations
 
     // Read oracle price
@@ -20,7 +24,7 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
     // match side {
     //     Side::Long => market.open_interest_long += size,
     //     Side::Short => market.open_interest_short += size,
-    // } 
+    // }
 
     msg!("Openning Position");
     Ok(())

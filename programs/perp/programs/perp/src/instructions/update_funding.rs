@@ -13,10 +13,18 @@ pub fn _update_funding(ctx: Context<UpdateFunding>) -> Result<()> {
     );
 
     // 1. Compute skew_ratio = (oi_long - oi_short) / max_skew.
-    let skew_ratio_bps = UpdateFunding::compute_skew_ratio_bps(market.oi_long, market.oi_short, market.risk_management.caps.max_skew);
+    let skew_ratio_bps = UpdateFunding::compute_skew_ratio_bps(
+        market.oi_long,
+        market.oi_short,
+        market.risk_management.caps.max_skew,
+    );
 
     // 2. Compute funding_rate = skew_ratio × sensitivity_bps, clamped.
-    let funding_rate_bps: i64 = UpdateFunding::compute_funding_rate(skew_ratio_bps, market.funding_config.sensitivity_bps, market.funding_config.max_rate_bps);
+    let funding_rate_bps: i64 = UpdateFunding::compute_funding_rate(
+        skew_ratio_bps,
+        market.funding_config.sensitivity_bps,
+        market.funding_config.max_rate_bps,
+    );
 
     // 3. cumulative_funding_index += funding_rate.
     market.funding_fees.cumulative_funding_index_bps += funding_rate_bps;
@@ -36,24 +44,28 @@ pub struct UpdateFunding<'info> {
 }
 
 impl<'info> UpdateFunding<'info> {
-
-    pub fn compute_skew_ratio_bps(curr_oi_long: MicroUsdc, curr_oi_short: MicroUsdc, max_skew: MicroUsdc) -> i64 {
+    pub fn compute_skew_ratio_bps(
+        curr_oi_long: MicroUsdc,
+        curr_oi_short: MicroUsdc,
+        max_skew: MicroUsdc,
+    ) -> i64 {
         if max_skew == 0 {
             return 0;
         }
         let skew = curr_oi_long as i128 - curr_oi_short as i128;
-        let skew_ratio = (skew * 10_000 / max_skew as i128) as i64; // Scale before divison to keep floats -> 7_500_000 / 500 = 15_000 instead of `1`
-        skew_ratio
+        (skew * 10_000 / max_skew as i128) as i64 // Scale before divison to keep floats -> 7_500_000 / 500 = 15_000 instead of `1`
     }
 
-    pub fn compute_funding_rate(skew_ratio_bps: i64, sensitivity_bps: u16, max_rate_bps: u16) -> i64 {
+    pub fn compute_funding_rate(
+        skew_ratio_bps: i64,
+        sensitivity_bps: u16,
+        max_rate_bps: u16,
+    ) -> i64 {
         let funding_rate_bps = skew_ratio_bps * sensitivity_bps as i64 / 10_000;
         let max = max_rate_bps as i64;
-        let funding_rate_bps = funding_rate_bps.clamp(-max, max);
-        funding_rate_bps
+        funding_rate_bps.clamp(-max, max)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -75,7 +87,8 @@ mod tests {
         let sensitivity_bps: u16 = 75;
         let max_rate_bps: u16 = 75;
 
-        let result = UpdateFunding::compute_funding_rate(skew_ratio_bps, sensitivity_bps, max_rate_bps);
+        let result =
+            UpdateFunding::compute_funding_rate(skew_ratio_bps, sensitivity_bps, max_rate_bps);
         assert_eq!(result, 15, "Must be 15 funding rate bps");
     }
 }

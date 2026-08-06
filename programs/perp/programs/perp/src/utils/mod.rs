@@ -1,8 +1,8 @@
 use crate::alliases::MicroUsdc;
 
-pub mod pnl;
-pub mod fee_model;
 pub mod caps;
+pub mod fee_model;
+pub mod pnl;
 
 /// Project the skew that this trade is going to result into (after)
 pub fn projected_skew(

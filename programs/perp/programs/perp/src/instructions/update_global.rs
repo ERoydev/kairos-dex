@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{GLOBAL_SEED, PerpError, events::GlobalUpdated, state::global::GlobalConfig};
+use crate::{events::GlobalUpdated, state::global::GlobalConfig, PerpError, GLOBAL_SEED};
 
 pub fn _update_global(ctx: Context<UpdateGlobal>, params: UpdateGlobalParams) -> Result<()> {
     let config = &mut ctx.accounts.global_config;
@@ -10,7 +10,10 @@ pub fn _update_global(ctx: Context<UpdateGlobal>, params: UpdateGlobalParams) ->
         config.authority = authority;
     }
     if let Some(fee_receiver) = params.fee_receiver {
-        require!(fee_receiver != Pubkey::default(), PerpError::InvalidFeeReceiver);
+        require!(
+            fee_receiver != Pubkey::default(),
+            PerpError::InvalidFeeReceiver
+        );
         config.fee_receiver = fee_receiver;
     }
     if let Some(is_paused) = params.is_paused {

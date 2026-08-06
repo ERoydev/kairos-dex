@@ -1,13 +1,16 @@
 use anchor_lang::prelude::*;
 
-use crate::{PerpError, GLOBAL_SEED, events::GlobalInitialized, state::global::GlobalConfig};
+use crate::{events::GlobalInitialized, state::global::GlobalConfig, PerpError, GLOBAL_SEED};
 
 pub fn _initialize_global(
     ctx: Context<InitializeGlobal>,
     fee_receiver: Pubkey,
     max_markets: u16,
 ) -> Result<()> {
-    require!(fee_receiver != Pubkey::default(), PerpError::InvalidFeeReceiver);
+    require!(
+        fee_receiver != Pubkey::default(),
+        PerpError::InvalidFeeReceiver
+    );
     require!(max_markets > 0, PerpError::InvalidConfig);
 
     let config = &mut ctx.accounts.global_config;
