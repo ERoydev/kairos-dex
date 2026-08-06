@@ -6,11 +6,11 @@ use anchor_lang::{
 use litesvm::LiteSVM;
 use solana_keypair::Keypair;
 use solana_message::{Message, VersionedMessage};
+use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
-use solana_sdk::native_token::LAMPORTS_PER_SOL;
 
-use perp::{state::syntetic_market::SynteticMarket, MConfig, MARKET_SEED, GLOBAL_SEED};
+use perp::{state::syntetic_market::SynteticMarket, SMParams, GLOBAL_SEED, MARKET_SEED};
 
 fn program_bytes() -> &'static [u8] {
     include_bytes!(concat!(env!("CARGO_TARGET_TMPDIR"), "/../deploy/perp.so"))
@@ -24,12 +24,10 @@ fn global_config_pda(program_id: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[GLOBAL_SEED], program_id).0
 }
 
-fn default_config() -> MConfig {
-    MConfig {
+fn default_config() -> SMParams {
+    SMParams {
         max_leverage: 20,
         mmr_bps: 500,
-        open_fee_bps: 10,
-        close_fee_bps: 10,
     }
 }
 
@@ -40,18 +38,36 @@ fn symbol(s: &str) -> [u8; 16] {
     buf
 }
 
-fn send_ix(svm: &mut LiteSVM, ix: Instruction, signers: &[&Keypair]) -> litesvm::types::TransactionResult {
+fn send_ix(
+    svm: &mut LiteSVM,
+    ix: Instruction,
+    signers: &[&Keypair],
+) -> litesvm::types::TransactionResult {
     let blockhash = svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&signers[0].pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), signers).unwrap();
     svm.send_transaction(tx)
 }
 
-fn make_initialize_global_ix(program_id: Pubkey, payer: Pubkey, global_config: Pubkey, fee_receiver: Pubkey) -> Instruction {
+fn make_initialize_global_ix(
+    program_id: Pubkey,
+    payer: Pubkey,
+    global_config: Pubkey,
+    fee_receiver: Pubkey,
+) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
-        &perp::instruction::InitializeGlobal { fee_receiver, max_markets: 10 }.data(),
-        perp::accounts::InitializeGlobal { payer, global_config, system_program: system_program::ID }.to_account_metas(None),
+        &perp::instruction::InitializeGlobal {
+            fee_receiver,
+            max_markets: 10,
+        }
+        .data(),
+        perp::accounts::InitializeGlobal {
+            payer,
+            global_config,
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
     )
 }
 
@@ -62,11 +78,15 @@ fn make_initialize_market_ix(
     market: Pubkey,
     oracle: Pubkey,
     sym: [u8; 16],
-    config: MConfig,
+    config: SMParams,
 ) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
-        &perp::instruction::InitializeMarket { symbol: sym, config }.data(),
+        &perp::instruction::InitializeMarket {
+            symbol: sym,
+            config,
+        }
+        .data(),
         perp::accounts::InitializeMarket {
             payer,
             global_config,
@@ -102,7 +122,15 @@ fn test_initialize_market_ok() {
     let oracle = Keypair::new().pubkey();
     let market = market_pda(&program_id, &sym);
 
-    let ix = make_initialize_market_ix(program_id, payer.pubkey(), global_config, market, oracle, sym, default_config());
+    let ix = make_initialize_market_ix(
+        program_id,
+        payer.pubkey(),
+        global_config,
+        market,
+        oracle,
+        sym,
+        default_config(),
+    );
     assert!(send_ix(&mut svm, ix, &[&payer]).is_ok());
 
     let account = svm.get_account(&market).expect("market not found");
@@ -122,13 +150,22 @@ fn test_initialize_market_ok() {
 fn test_initialize_market_rejects_non_admin() {
     let (mut svm, _payer, program_id, global_config) = setup();
     let attacker = Keypair::new();
-    svm.airdrop(&attacker.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+    svm.airdrop(&attacker.pubkey(), 10 * LAMPORTS_PER_SOL)
+        .unwrap();
 
     let sym = symbol("BTC-PERP");
     let oracle = Keypair::new().pubkey();
     let market = market_pda(&program_id, &sym);
 
-    let ix = make_initialize_market_ix(program_id, attacker.pubkey(), global_config, market, oracle, sym, default_config());
+    let ix = make_initialize_market_ix(
+        program_id,
+        attacker.pubkey(),
+        global_config,
+        market,
+        oracle,
+        sym,
+        default_config(),
+    );
     assert!(send_ix(&mut svm, ix, &[&attacker]).is_err());
 }
 
@@ -142,7 +179,15 @@ fn test_initialize_market_rejects_zero_leverage() {
     let mut config = default_config();
     config.max_leverage = 0;
 
-    let ix = make_initialize_market_ix(program_id, payer.pubkey(), global_config, market, oracle, sym, config);
+    let ix = make_initialize_market_ix(
+        program_id,
+        payer.pubkey(),
+        global_config,
+        market,
+        oracle,
+        sym,
+        config,
+    );
     assert!(send_ix(&mut svm, ix, &[&payer]).is_err());
 }
 
@@ -154,9 +199,16 @@ fn test_initialize_market_rejects_fee_over_100_percent() {
     let market = market_pda(&program_id, &sym);
 
     let mut config = default_config();
-    config.open_fee_bps = 10_000;
 
-    let ix = make_initialize_market_ix(program_id, payer.pubkey(), global_config, market, oracle, sym, config);
+    let ix = make_initialize_market_ix(
+        program_id,
+        payer.pubkey(),
+        global_config,
+        market,
+        oracle,
+        sym,
+        config,
+    );
     assert!(send_ix(&mut svm, ix, &[&payer]).is_err());
 }
 
@@ -166,6 +218,14 @@ fn test_initialize_market_rejects_default_oracle() {
     let sym = symbol("ARB-PERP");
     let market = market_pda(&program_id, &sym);
 
-    let ix = make_initialize_market_ix(program_id, payer.pubkey(), global_config, market, Pubkey::default(), sym, default_config());
+    let ix = make_initialize_market_ix(
+        program_id,
+        payer.pubkey(),
+        global_config,
+        market,
+        Pubkey::default(),
+        sym,
+        default_config(),
+    );
     assert!(send_ix(&mut svm, ix, &[&payer]).is_err());
 }

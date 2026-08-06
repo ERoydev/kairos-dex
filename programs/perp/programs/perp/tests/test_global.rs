@@ -6,9 +6,9 @@ use anchor_lang::{
 use litesvm::LiteSVM;
 use solana_keypair::Keypair;
 use solana_message::{Message, VersionedMessage};
+use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
-use solana_sdk::native_token::LAMPORTS_PER_SOL;
 
 use perp::{state::global::GlobalConfig, GLOBAL_SEED};
 
@@ -29,7 +29,11 @@ fn make_initialize_global_ix(
 ) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
-        &perp::instruction::InitializeGlobal { fee_receiver, max_markets }.data(),
+        &perp::instruction::InitializeGlobal {
+            fee_receiver,
+            max_markets,
+        }
+        .data(),
         perp::accounts::InitializeGlobal {
             payer,
             global_config,
@@ -67,7 +71,11 @@ fn setup() -> (LiteSVM, Keypair, Pubkey) {
     (svm, payer, program_id)
 }
 
-fn send_ix(svm: &mut LiteSVM, ix: Instruction, signers: &[&Keypair]) -> litesvm::types::TransactionResult {
+fn send_ix(
+    svm: &mut LiteSVM,
+    ix: Instruction,
+    signers: &[&Keypair],
+) -> litesvm::types::TransactionResult {
     let blockhash = svm.latest_blockhash();
     let payer_pubkey = signers[0].pubkey();
     let msg = Message::new_with_blockhash(&[ix], Some(&payer_pubkey), &blockhash);
@@ -84,7 +92,9 @@ fn test_initialize_global_ok() {
     let ix = make_initialize_global_ix(program_id, payer.pubkey(), global_config, fee_receiver, 10);
     assert!(send_ix(&mut svm, ix, &[&payer]).is_ok());
 
-    let account = svm.get_account(&global_config).expect("global_config not found");
+    let account = svm
+        .get_account(&global_config)
+        .expect("global_config not found");
     let data = GlobalConfig::try_deserialize(&mut account.data.as_slice()).unwrap();
 
     assert_eq!(data.authority, payer.pubkey());
@@ -98,7 +108,13 @@ fn test_initialize_global_rejects_default_fee_receiver() {
     let (mut svm, payer, program_id) = setup();
     let global_config = global_config_pda(&program_id);
 
-    let ix = make_initialize_global_ix(program_id, payer.pubkey(), global_config, Pubkey::default(), 10);
+    let ix = make_initialize_global_ix(
+        program_id,
+        payer.pubkey(),
+        global_config,
+        Pubkey::default(),
+        10,
+    );
     assert!(send_ix(&mut svm, ix, &[&payer]).is_err());
 }
 
@@ -108,7 +124,8 @@ fn test_update_global_pauses() {
     let global_config = global_config_pda(&program_id);
     let fee_receiver = Keypair::new().pubkey();
 
-    let init_ix = make_initialize_global_ix(program_id, payer.pubkey(), global_config, fee_receiver, 10);
+    let init_ix =
+        make_initialize_global_ix(program_id, payer.pubkey(), global_config, fee_receiver, 10);
     send_ix(&mut svm, init_ix, &[&payer]).unwrap();
 
     let update_ix = make_update_global_ix(
@@ -137,7 +154,8 @@ fn test_update_global_rejects_unauthorized() {
     let global_config = global_config_pda(&program_id);
     let fee_receiver = Keypair::new().pubkey();
 
-    let init_ix = make_initialize_global_ix(program_id, payer.pubkey(), global_config, fee_receiver, 10);
+    let init_ix =
+        make_initialize_global_ix(program_id, payer.pubkey(), global_config, fee_receiver, 10);
     send_ix(&mut svm, init_ix, &[&payer]).unwrap();
 
     let attacker = Keypair::new();

@@ -1,12 +1,13 @@
 use anchor_lang::prelude::*;
-use crate::{MARKET_SEED, MARKET_VERSION, GLOBAL_SEED, events::MarketInitialized, syntetic_market::SynteticMarket, error::PerpError, state::global::GlobalConfig};
+use crate::{error::PerpError, events::MarketInitialized, state::global::GlobalConfig, syntetic_market::{FeeSchedule, FundingConfig, FundingFees, RiskManagementParameters, SynteticMarket, TvlScaledCaps}, utils::caps::compute_caps, GLOBAL_SEED, MARKET_SEED, MARKET_VERSION};
 
 // Admin instruction
-pub fn _initialize_market(ctx: Context<InitializeMarket>, symbol: [u8; 16], config: MConfig) -> Result<()> {
+pub fn _initialize_market(ctx: Context<InitializeMarket>, symbol: [u8; 16], config: SMParams) -> Result<()> {
     require!(config.max_leverage > 0, PerpError::InvalidConfig);
-    require!(config.open_fee_bps < 10_000, PerpError::InvalidConfig);
-    require!(config.close_fee_bps < 10_000, PerpError::InvalidConfig);
     require!(config.mmr_bps < 10_000, PerpError::InvalidConfig);
+
+    // TODO: Fix later
+    let mock_lp_tvl = 50_000;
 
     let market = &mut ctx.accounts.market;
     market.version = MARKET_VERSION;
@@ -14,15 +15,23 @@ pub fn _initialize_market(ctx: Context<InitializeMarket>, symbol: [u8; 16], conf
     market.authority = ctx.accounts.payer.key();
     market.symbol = symbol;
     market.oracle = ctx.accounts.oracle.key();
-    // market.max_leverage = config.max_leverage;
-    // market.open_interest_long = 0;
-    // market.open_interest_short = 0;
+    
+    // runtime state
+    market.oi_long = 0;
+    market.oi_short = 0;
+    market.funding_fees = FundingFees::default();
 
-    // market.maintenance_margin_bps = config.mmr_bps;
-    // market.open_fee_bps = config.open_fee_bps;
-    // market.close_fee_bps = config.close_fee_bps;
+    // config
+    market.risk_management = RiskManagementParameters {
+        max_leverage: config.max_leverage,
+        maintenance_margin_bps: config.mmr_bps,
+        fee_schedule: FeeSchedule::default(),
+        caps: compute_caps(mock_lp_tvl)
+    };
+    
+    market.funding_config = FundingConfig::default();
 
-    market.market_status = true;
+    market.is_active = true;
 
     emit!(MarketInitialized {
         market: ctx.accounts.market.key(),
@@ -68,11 +77,7 @@ pub struct InitializeMarket<'info> {
 
 // TODO: Maybe i need to adjust some formulas so for example open_long_interest and open_fee_bps can be adjusted dynamically on trader positions
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct MConfig {
-    // TODO: No risk management
-    pub max_leverage: u64,
-    pub mmr_bps: u64,
-    pub open_fee_bps: u64,
-    pub close_fee_bps: u64,
+pub struct SMParams {
+    pub max_leverage: u16,
+    pub mmr_bps: u16,
 }
-

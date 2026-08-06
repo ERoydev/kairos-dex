@@ -12,4 +12,8 @@ pub enum PerpError {
     InvalidAuthority,
     #[msg("Fee receiver cannot be the default pubkey")]
     InvalidFeeReceiver,
+    #[msg("Math operation resulted in overflow or underflow")]
+    MathOverflow,
+    #[msg("Funding too early")]
+    FundingTooEarly
 }

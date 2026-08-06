@@ -19,7 +19,7 @@ declare_id!("pCbREQ2zyCWGZ61CCsySAiMmWkKvcQreviF7yL3NP4B");
 pub mod perp {
     use super::*;
 
-    pub fn initialize_market(ctx: Context<InitializeMarket>, symbol: [u8; 16], config: MConfig) -> Result<()> {
+    pub fn initialize_market(ctx: Context<InitializeMarket>, symbol: [u8; 16], config: SMParams) -> Result<()> {
         crate::instructions::_initialize_market(ctx, symbol, config)
     }
 
