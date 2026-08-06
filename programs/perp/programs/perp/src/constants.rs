@@ -1,14 +1,23 @@
 use anchor_lang::prelude::*;
 
-// --- Numerical constants
-#[constant]
-pub const DEFAULT_DECIMALS: u8 = 6;
-
-#[constant]
-pub const TRADE_FEE_BPS: u64 = 10; // 0.10%, charged on both open and close
+// --- Global configuration variables
 
 #[constant]
 pub const MARKET_VERSION: u8 = 1;
+
+#[constant]
+pub const DEFAULT_DECIMALS: u8 = 6;
+
+
+// --- Numerical constants
+
+
+// FeeSchedule
+#[constant]
+pub const BASE_FEE_BPS: u16 = 10; // 0.10%, charged on both open and close
+
+#[constant]
+pub const SKEW_FEE_MAX_BPS: u16 = 20; // up to 0.20% extra at max skew
 
 // --- Seeds
 

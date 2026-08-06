@@ -1,17 +1,17 @@
-use crate::position::PositionType;
+use crate::{alliases::MicroUsdc, position::PositionType};
 
 
 /// Computes PnL in USDC (same precision as `size`/`margin`) for a position.
 /// `size` is the notional exposure in USDC, entry/exit prices share the same decimals.
 pub fn calculate_pnl(
     side: PositionType,
-    entry_price: u64,
-    exit_price: u64,
-    size: u64,
+    entry_price: MicroUsdc,
+    exit_price: MicroUsdc,
+    position_size: MicroUsdc,
 ) -> i64 {
     let entry = entry_price as i128;
     let exit = exit_price as i128;
-    let size = size as i128;
+    let size = position_size as i128;
     
     // pnl = (exit - entry) * size_usdc / entry,  reversed on `Short`
     let price_diff = match side {
@@ -20,7 +20,7 @@ pub fn calculate_pnl(
     };
  
     let pnl = price_diff * size / entry;
-    pnl as i64
+    pnl as i64 
 }
 
 /// Called from close_position / liquidate after calculate_pnl().
