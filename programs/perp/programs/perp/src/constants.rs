@@ -11,6 +11,14 @@ pub const DEFAULT_DECIMALS: u8 = 6;
 
 // --- Numerical constants
 
+#[constant]
+pub const SENSITIVITY_BPS: u16 = 75; // 0.75 multiplier, it is replacement for premium
+
+#[constant]
+pub const MAX_RATE_BPS: u16 = 75; // 0.75 cap of funding rate per hour. Strong enough to correct skew, not so brutal to liquidate via funding alone
+
+#[constant]
+pub const INTERVAL_SECONDS: u16 = 3600;
 
 // FeeSchedule
 #[constant]

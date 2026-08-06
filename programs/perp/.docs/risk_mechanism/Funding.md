@@ -28,23 +28,6 @@ Funding is actually applied to collateral only when the position is touched:
 
 ## Funding Fee Math
 
-I will keep track of two cumulative funding fees.
-- the current_cumulative_funding_fee
-- the entry_cumulative_funding_fee
-
-Then i keep track of another cumulative funding fees.
-- long_cumulative_funding_fee
-- short_cumulative_funding_fee
-
-1. funding fee per position size, that this user have to pay, because he took some positions from t2 to t5 for example
-F_i = funding_fee_at_time_i/long_open_interest_at_time_i
-
-2. side that is going to claim this funding fee, this results in amount of funding fee that shorts can claim per position size at time i
-C_i = funding_fee_at_time_i/short_open_interest_at_time_i
-Bro
-
-## Brainstorm
-
 ```
 skew = oi_long - oi_short
 skew_ratio = skew / max_skew        // between -1 and +1
@@ -69,6 +52,15 @@ for short: collateral += accrued  // positive delta = short receives
 3. Position setup (on open)
 
 position.entry_funding_index = market.cumulative_funding_index  // snapshot at open
+
+### Parameters
+
+`sensitivity_bps` -> replaces the premium calculation(diff between spot price and contract price). Instead of "how far mark is from spot," you use "how far skew is from balanced."
+`max_rate_bps` -> safety cap on the final funding rate.
+`interval_seconds` -> bot invokes update_funding() in this interval
+
+`cumulative_funding_index_bps` -> updated by update_funding()
+`max_skew` -> hard cap on |oi_long - oi_short|. Represents the maximum net directional exposure the LP is willing to take. Default ~20% of LP TVL. Used both as a hard reject threshold on new trades and as the denominator for skew_ratio in funding calculation.
 
 
 ### Order of implementation
