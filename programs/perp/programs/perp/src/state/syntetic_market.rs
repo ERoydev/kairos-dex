@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{alliases::MicroUsdc};
-
+use crate::alliases::MicroUsdc;
 
 /*
 Market PDA
@@ -18,32 +17,35 @@ It is not a service, it's just a dev script something that is admin-triggered ev
 pub struct SynteticMarket {
     pub version: u8,
     pub bump: u8,
-    pub authority: Pubkey,                         // admin who can update config
-    pub symbol: [u8; 16],                          // e.g. "BTC-PERP", padded, each char stored in ASCII number
-    
-    pub oracle: Pubkey,                            // Pyth/Switchboard price feed account
+    pub authority: Pubkey, // admin who can update config
+    pub symbol: [u8; 16],  // e.g. "BTC-PERP", padded, each char stored in ASCII number
 
-    pub oi_long: MicroUsdc,                        // current total long size
-    pub oi_short: MicroUsdc,                       // current total short size
+    pub oracle: Pubkey, // Pyth/Switchboard price feed account
 
+    // runtime state
+    pub oi_long: MicroUsdc,  // current total long size
+    pub oi_short: MicroUsdc, // current total short size
+    pub funding_fees: FundingFees,
+
+    // config
     pub risk_management: RiskManagementParameters,
-    pub market_status: bool,                       // admin can pause a market
+    pub funding_config: FundingConfig,
 
+    pub is_active: bool, // admin can pause a market
     pub _reserved: [u8; 64],
 }
 
-/// Layer 1 of Risk management 
+/// Layer 1 of Risk management
 #[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct RiskManagementParameters {
     pub max_leverage: u16,
-    // TODO: Understand that shit from real sources not claudez
-    pub maintenance_margin_ratio: u16,           // MMR, liquidation threshold
-    pub max_position_notional: MicroUsdc,        // single position size cap -> 100,000 for example means, a Position cannot exceed this in USDC
-    pub max_user_notional: MicroUsdc,            // cap on the sum of all one user's positions in that market.
-    pub max_oi_long: MicroUsdc,                  // gross open interest caps per side
+    pub maintenance_margin_ratio: u16, // MMR, liquidation threshold
+    pub max_position_notional: MicroUsdc, // single position size cap -> 100,000 for example means, a Position cannot exceed this in USDC
+    pub max_user_notional: MicroUsdc, // cap on the sum of all one user's positions in that market.
+    pub max_oi_long: MicroUsdc,       // gross open interest caps per side
     pub max_oi_short: MicroUsdc,
-    pub max_skew: MicroUsdc,                     // net directional cap, 20% of Total Value Locked in LP Pool
-    pub fee_schedule: FeeSchedule,               // base fees + skew curve
+    pub max_skew: MicroUsdc, // net directional cap, 20% of Total Value Locked in LP Pool
+    pub fee_schedule: FeeSchedule, // base fees + skew curve
 }
 
 #[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
@@ -55,7 +57,18 @@ pub struct FeeSchedule {
     pub skew_fee_max_bps: u16,
 }
 
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
+pub struct FundingFees {
+    pub cumulative_funding_index: i64,
+    pub last_funding_time: i64,
+}
 
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
+pub struct FundingConfig {
+    pub sensitivity_bps: u16,
+    pub max_rate_bps: u16,
+    pub interval_seconds: u32,
+}
 
 // GLOBAL
 // exposure_multiplier — multiplier on LP backing for global net delta cap.
