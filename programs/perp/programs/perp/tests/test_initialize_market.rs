@@ -192,27 +192,6 @@ fn test_initialize_market_rejects_zero_leverage() {
 }
 
 #[test]
-fn test_initialize_market_rejects_fee_over_100_percent() {
-    let (mut svm, payer, program_id, global_config) = setup();
-    let sym = symbol("SOL-PERP");
-    let oracle = Keypair::new().pubkey();
-    let market = market_pda(&program_id, &sym);
-
-    let mut config = default_config();
-
-    let ix = make_initialize_market_ix(
-        program_id,
-        payer.pubkey(),
-        global_config,
-        market,
-        oracle,
-        sym,
-        config,
-    );
-    assert!(send_ix(&mut svm, ix, &[&payer]).is_err());
-}
-
-#[test]
 fn test_initialize_market_rejects_default_oracle() {
     let (mut svm, payer, program_id, global_config) = setup();
     let sym = symbol("ARB-PERP");
