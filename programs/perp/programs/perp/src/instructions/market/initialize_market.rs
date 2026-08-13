@@ -1,14 +1,11 @@
 use crate::{
-    error::PerpError,
-    events::MarketInitialized,
-    state::global::GlobalConfig,
-    syntetic_market::{
+    error::PerpError, events::MarketInitialized, state::global::GlobalConfig, syntetic_market::{
         FeeSchedule, FundingConfig, FundingFees, RiskManagementParameters, SynteticMarket,
-    },
-    utils::caps::compute_caps,
-    GLOBAL_SEED, MARKET_SEED, MARKET_VERSION,
+    }, utils::caps::compute_caps, GLOBAL_SEED, MARKET_SEED, MARKET_VAULT, MARKET_VERSION
 };
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+
 
 // Admin instruction
 pub fn _initialize_market(
@@ -27,7 +24,10 @@ pub fn _initialize_market(
     market.bump = ctx.bumps.market;
     market.authority = ctx.accounts.payer.key();
     market.symbol = symbol;
+
+    // Set oracle and feed_id
     market.oracle = ctx.accounts.oracle.key();
+    market.feed_id = config.feed_id;
 
     // runtime state
     market.oi_long = 0;
@@ -65,6 +65,7 @@ pub struct InitializeMarket<'info> {
     )]
     pub payer: Signer<'info>,
 
+    /// Sets all the GlobalConfig for that market
     #[account(
         seeds = [GLOBAL_SEED],
         bump = global_config.bump,
@@ -80,10 +81,24 @@ pub struct InitializeMarket<'info> {
     )]
     pub market: Account<'info, SynteticMarket>,
 
+    /// The market Vault, used for temporary storage of funds
+    #[account(
+        init,
+        payer = payer,
+        seeds = [MARKET_VAULT, market.key().as_ref()],
+        bump,
+        token::mint = usdc_mint,
+        token::authority = vault
+    )]
+    pub vault: InterfaceAccount<'info, TokenAccount>,
+
     /// CHECK: It Is Checked
     #[account(constraint=oracle.key() != Pubkey::default())]
     pub oracle: UncheckedAccount<'info>,
 
+    pub usdc_mint: InterfaceAccount<'info, Mint>,
+
+    pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
 
@@ -91,4 +106,5 @@ pub struct InitializeMarket<'info> {
 pub struct SMParams {
     pub max_leverage: u16,
     pub mmr_bps: u16,
+    pub feed_id: String,
 }

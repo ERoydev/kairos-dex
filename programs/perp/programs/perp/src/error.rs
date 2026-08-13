@@ -16,4 +16,14 @@ pub enum PerpError {
     MathOverflow,
     #[msg("Funding too early")]
     FundingTooEarly,
+    #[msg("Market is already in the requested state")]
+    MarketAlreadyInState,
+    #[msg("Market is paused")]
+    MarketPaused,
+    #[msg("MaxSkewLimitExceeded")]
+    MaxSkewLimitExceeded,
+    #[msg("Position notional exceeds market's max position notional cap")]
+    PositionExceedsMaxNotional,
+    #[msg("Trade would exceed the market's open interest cap for this side")]
+    OpenInterestCapExceeded,
 }
