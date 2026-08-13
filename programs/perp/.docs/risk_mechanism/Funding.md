@@ -2,7 +2,7 @@
 reference: https://hyperliquid.gitbook.io/hyperliquid-docs/trading/funding#technical-details
 https://medium.com/@compasslabs/a-guide-to-perpetual-contracts-and-gmx-v2-a4770cbc25e3
 
-I need funding mechanism in order to balance what counter poistion my LP Pool takes in order to balance profin and losses.
+I need funding mechanism in order to balance what counter poistion my LP Pool takes in order to balance profit and losses.
 
 Firstly the whole point of `Funding` is trader to trader, not me:
 - Longs crowded → longs pay shorts. Money moves from long positions' collateral to short positions' collateral.
@@ -71,3 +71,7 @@ In open_position: snapshot entry_funding_index (step 3).
 In close_position / liquidate_position / health check: settle funding (step 2) before doing anything else.
 
 Then run a bot that calls update_funding every interval_seconds. Done.
+
+
+# Note
+May fold that into liquidation Bot service

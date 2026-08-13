@@ -2,6 +2,7 @@
   {
     "symbol": "BTC-PERP",
     "oracle": "4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo",
+    "feed_id": "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
     "max_leverage": 20,
     "maintenance_margin_bps": 250,
     "is_initialized": false
