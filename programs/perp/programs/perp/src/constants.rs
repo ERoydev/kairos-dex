@@ -6,7 +6,16 @@ use anchor_lang::prelude::*;
 pub const MARKET_VERSION: u8 = 1;
 
 #[constant]
+pub const POSITION_VERSION: u8 = 1;
+
+#[constant]
 pub const DEFAULT_DECIMALS: u8 = 6;
+
+#[constant]
+pub const PROTOCOL_FEES_BPS: u16 = 1500;
+
+#[constant]
+pub const LP_FEES_BPS: u16 = 8500;
 
 // --- Numerical constants
 
@@ -36,3 +45,6 @@ pub const MARKET_SEED: &[u8] = b"market_seed";
 
 #[constant]
 pub const GLOBAL_SEED: &[u8] = b"global";
+
+#[constant]
+pub const MARKET_VAULT: &[u8] = b"market_vault";

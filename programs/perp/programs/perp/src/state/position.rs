@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::{alliases::MicroUsdc, POSITION_VERSION};
+
 #[account]
 #[derive(InitSpace)]
 pub struct Position {
@@ -10,16 +12,23 @@ pub struct Position {
     pub market: Pubkey, // which market (or a market ID/enum if not per-account)
 
     pub side: PositionType, // Long or Short
-    pub size: u64,          // notional exposure in USDC
-    pub margin: u64,        // collateral locked (after open fee deducted)
-    pub entry_price: u64,   // oracle price at open, same decimals as USDC
+    pub collateral: MicroUsdc, // margin deposited (minus opening fee)
+    pub notional: MicroUsdc, // Position_size = margin x leverage
+    pub entry_price: MicroUsdc,     // oracle price at open (in MicroUSDC precision)
 
     pub opened_at: i64, // unix timestamp
 
-    pub is_open: bool, // false once closed/liquidated (or just close the account)
-    pub entry_funding_index: i64, // funding index of the Market at entry, used to calculate owed fees
+    pub entry_funding_index: i64,   // funding index of the Market at entry, used to calculate owed fees
+
+    // When position is closed, this account get's closed and rent is returned to owner, no need for bool var
 
     pub _reserved: [u8; 64], // room for future fields
+}
+
+impl Position {
+    pub fn get_version() -> u8 {
+        POSITION_VERSION
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace)]
