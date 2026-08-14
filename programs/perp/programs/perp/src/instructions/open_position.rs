@@ -105,7 +105,12 @@ pub struct OpenPosition<'info> {
 
     // Account from Pyth to add into ix Context, when i need Price data.
     // This type will automatically perform a check for the account that is owned by Pyth Pull Oracle program
-    pub price_update: Account<'info, PriceUpdateV2>,
+    //
+    // Boxed: OpenPosition validates 13 accounts in one Anchor-generated try_accounts
+    // function; left unboxed, several of the larger accounts here (this one, position,
+    // market, lp_pool) together overflow the 4KB BPF stack frame during account
+    // validation. Boxing moves the deserialized value to the heap.
+    pub price_update: Box<Account<'info, PriceUpdateV2>>,
 
     // --- Perp accounts
     pub global_config: Account<'info, GlobalConfig>,
@@ -118,7 +123,7 @@ pub struct OpenPosition<'info> {
         bump
 
     )]
-    pub position: Account<'info, Position>,
+    pub position: Box<Account<'info, Position>>,
 
     #[account(
         mut,
@@ -127,14 +132,15 @@ pub struct OpenPosition<'info> {
         token::mint = usdc_mint,
         token::authority = market_vault
     )]
-    pub market_vault: InterfaceAccount<'info, TokenAccount>,
+    pub market_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(mut)]
-    pub market: Account<'info, SynteticMarket>,
+    pub market: Box<Account<'info, SynteticMarket>>,
 
     // --- LP Pool accounts
     #[account(mut)]
-    pub lp_pool: Account<'info, Pool>,
+    pub lp_pool: Box<Account<'info, Pool>>,
+    #[account(mut)]
     pub lp_pool_usdc_vault: InterfaceAccount<'info, TokenAccount>,
     /// CHECK: lp pool prgoram ID stored for CPI access control
     pub lp_pool_program: UncheckedAccount<'info>,
@@ -146,7 +152,8 @@ pub struct OpenPosition<'info> {
         associated_token::mint = usdc_mint,
         associated_token::authority = global_config.fee_receiver,
     )]
-    pub fee_receiver_ata: InterfaceAccount<'info, TokenAccount>,
+    pub fee_receiver_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(mut)]
     pub trader_usdc_ata: InterfaceAccount<'info, TokenAccount>,
 
     // --- Mints
