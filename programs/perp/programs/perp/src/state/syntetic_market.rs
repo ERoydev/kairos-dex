@@ -1,0 +1,142 @@
+use anchor_lang::prelude::*;
+
+use crate::{
+    BASE_FEE_BPS, INTERVAL_SECONDS, LP_FEES_BPS, MAX_RATE_BPS, PROTOCOL_FEES_BPS, PerpError, SENSITIVITY_BPS, SKEW_FEE_MAX_BPS, alliases::MicroUsdc,
+};
+
+/*
+Market PDA
+
+To handle which markets my protocol supports their risk config(max leverage, OI caps, fees)
+
+Basically is going to be handled by On-chain instruction to create the Market setup
+and an off-chain script that reads from .json and calls initialize_market for each entry.
+It is not a service, it's just a dev script something that is admin-triggered event manually.
+*/
+
+#[account]
+#[derive(InitSpace)]
+pub struct SynteticMarket {
+    pub version: u8,
+    pub bump: u8,
+    pub authority: Pubkey, // admin who can update config
+    pub symbol: [u8; 16],  // e.g. "BTC-PERP", padded, each char stored in ASCII number
+
+    pub oracle: Pubkey, // Pyth/Switchboard price feed account
+    #[max_len(66)]
+    pub feed_id: String, // Pyth/Switchboard price feed ID, used to verify the oracle account, stored with 0x prefix, 32 bytes hex string
+
+    // runtime state
+    pub oi_long: MicroUsdc,  // current total long size
+    pub oi_short: MicroUsdc, // current total short size
+    pub funding_fees: FundingFees,
+
+    // config
+    pub risk_management: RiskManagementParameters,
+    pub funding_config: FundingConfig,
+
+    pub is_active: bool, // admin can pause a market
+    pub _reserved: [u8; 64],
+}
+
+impl SynteticMarket {
+
+    /// Calcualte the OI interests and return the computed values (new_oi, oi_cap)
+    pub fn calc_open_interest(is_long: bool, position_size: MicroUsdc, oi_long: MicroUsdc, oi_short: MicroUsdc, max_oi_long: MicroUsdc, max_oi_short: MicroUsdc) -> Result<(MicroUsdc, MicroUsdc)> {
+        let new_oi = if is_long {
+            oi_long.checked_add(position_size).ok_or(PerpError::MathOverflow)?
+        } else {
+            oi_short.checked_add(position_size).ok_or(PerpError::MathOverflow)?
+        };
+        let oi_cap = if is_long {
+            max_oi_long
+        } else {
+            max_oi_short
+        };
+
+        Ok((new_oi, oi_cap))
+    }
+
+    /// protocol_fees floors down integer divison; lp_fees takes the remained via subtraction
+    pub fn calc_distributed_fees(total_fees: MicroUsdc) -> Result<(MicroUsdc, MicroUsdc)> {
+
+        let protocol_fees = (total_fees as u128)
+            .checked_mul(PROTOCOL_FEES_BPS as u128)
+            .ok_or(PerpError::MathOverflow)?
+            .checked_div(10_000)
+            .ok_or(PerpError::MathOverflow)? as u64;
+
+        let lp_fees = total_fees
+            .checked_sub(protocol_fees)
+            .ok_or(PerpError::MathOverflow)?;
+
+    Ok((protocol_fees, lp_fees))
+    }
+}
+
+/// Layer 1 of Risk management
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
+pub struct RiskManagementParameters {
+    pub max_leverage: u16,
+    pub maintenance_margin_bps: u16, // MMR, liquidation threshold
+    pub fee_schedule: FeeSchedule,   // base fees + skew curve
+    pub caps: TvlScaledCaps,
+}
+
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
+/// Those get updated, when TVL in the pool grows or shrinks
+pub struct TvlScaledCaps {
+    pub max_position_notional: MicroUsdc,   // single position size cap -> 100,000 for example means, a Position cannot exceed this in USDC
+    pub max_user_notional: MicroUsdc,       // cap on the sum of all one user's positions in that market.
+    pub max_oi_long: MicroUsdc,             // gross open interest caps per side
+    pub max_oi_short: MicroUsdc,
+    pub max_skew: MicroUsdc,                // net directional cap, 20% of Total Value Locked in LP Pool
+}
+
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
+pub struct FeeSchedule {
+    /// Flat fee applied to every trade, in basis points (1 bps = 0.01%)
+    pub base_fee_bps: u16,
+
+    /// Max extra fee added when a trade pushes skew to the cap, in bps
+    pub skew_fee_max_bps: u16,
+}
+
+impl Default for FeeSchedule {
+    fn default() -> Self {
+        FeeSchedule {
+            base_fee_bps: BASE_FEE_BPS,
+            skew_fee_max_bps: SKEW_FEE_MAX_BPS,
+        }
+    }
+}
+
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize, Default)]
+pub struct FundingFees {
+    // The bot every hour calls update_funding to update cumulative_index
+    pub cumulative_funding_index_bps: i64,
+    pub last_funding_time: i64,
+}
+
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
+pub struct FundingConfig {
+    pub sensitivity_bps: u16,
+    pub max_rate_bps: u16,
+    pub interval_seconds: u16,
+}
+
+impl Default for FundingConfig {
+    fn default() -> Self {
+        FundingConfig {
+            sensitivity_bps: SENSITIVITY_BPS,
+            max_rate_bps: MAX_RATE_BPS,
+            interval_seconds: INTERVAL_SECONDS,
+        }
+    }
+}
+
+// GLOBAL
+// exposure_multiplier — multiplier on LP backing for global net delta cap.
+// max_oracle_staleness — max oracle age.
+// max_oracle_deviation_bps — max divergence from reference feed.
+// insurance_fund_min_balance — floor that gates ADL.
