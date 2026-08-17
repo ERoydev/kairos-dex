@@ -58,9 +58,14 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
     // Distribute fees
     let (protocol_fees, lp_fees): (MicroUsdc, MicroUsdc) = SynteticMarket::calc_distributed_fees(fee_to_pay)?;
 
-    // Settle funds. Margin must land in market_vault before credit_lp_pool forwards
-    // lp_fees back out of it — credit_lp_pool uses market_vault as its funding source.
-    ctx.accounts.transfer_margin_to_vault(margin)?;
+    // Settle funds. credit_lp_pool's CPI can only pull from an account market_vault
+    // itself controls (its `source` authority must be the signing `caller`), so
+    // lp_fees has to round-trip through the vault rather than going straight from
+    // the trader to the pool. That means the vault must receive margin + lp_fees
+    // up front — depositing only `margin` here would leave the vault short by
+    // lp_fees the moment credit_lp_pool forwards it out below, understating what's
+    // actually backing `position.collateral` for every future payout.
+    ctx.accounts.transfer_margin_to_vault(margin.checked_add(lp_fees).ok_or(PerpError::MathOverflow)?)?;
     ctx.accounts.transfer_protocol_fee(protocol_fees)?;
     ctx.accounts.credit_lp_pool(lp_fees, ctx.bumps.market_vault)?;
 

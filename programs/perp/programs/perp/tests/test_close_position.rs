@@ -1,26 +1,20 @@
-// Integration test for `open_position`, using LiteSVM with both `perp.so` and
-// `liquidity_pool.so` loaded so the real credit CPI path executes end to end.
+// Integration test for `close_position`, using LiteSVM with both `perp.so` and
+// `liquidity_pool.so` loaded so the credit/debit CPI paths execute end to end.
 //
-// Accounts a single open_position call needs, in setup order:
-//   1. global_config        (perp::initialize_global)
-//   2. market + market_vault (perp::initialize_market)
-//   3. lp_pool + lp_pool_usdc_vault + lp_mint (liquidity_pool::initialize_pool),
-//      with pool.perp_program == perp::id() so the CPI auth check in `credit` passes
-//   4. usdc_mint, trader_usdc_ata (funded), fee_receiver_ata
-//   5. a fabricated PriceUpdateV2 account owned by the pyth receiver program id —
-//      we don't run the real Pyth receiver program on-chain, so this is hand-built
-//   6. position PDA (init'd by the instruction itself)
+// Each test opens a position first (via open_position), then closes it and
+// asserts token movements across trader / market_vault / fee_receiver / lp_pool.
 //
 // Build prerequisite (not run by `cargo test` automatically):
 //   `cargo build-sbf --features dev` in programs/perp/programs/perp, so
 //   target/deploy/perp.so exists for `perp_bytes()` below. liquidity_pool.so is
-//   pulled from the sibling liquidity-pool repo's own target/deploy — see
-//   `liquidity_pool_bytes()`.
+//   pulled from the sibling liquidity-pool repo's own target/deploy.
 //
-// STATUS: one passing happy-path test (long, under all caps). Not yet covered:
-// short side, non-zero fee split (blocked by initialize_market's hardcoded
-// mock_lp_tvl capping max_position_notional too low to produce fee >= 1), and
-// failure cases (market paused, caps exceeded, stale price, unauthorized).
+// Covers three settlement branches of `settle()`:
+//   - breakeven (payout == collateral, no pool interaction)
+//   - full loss (payout == 0, entire collateral credited to pool)
+//   - profit beyond own collateral (payout split: vault covers the trader's own
+//     collateral, pool covers the rest via `debit`) — this is the branch that
+//     had a double-payment bug (vault_payout wasn't subtracting debit_from_pool).
 
 use anchor_lang::{
     prelude::Pubkey,
@@ -67,9 +61,8 @@ fn symbol(s: &str) -> [u8; 16] {
 }
 
 /// initialize_market hardcodes mock_lp_tvl = 50_000, which makes max_position_notional
-/// a tiny 500 MicroUsdc — too low for base_fee_bps=10 to ever produce a non-zero fee
-/// (needs notional >= 1000). To exercise the fee-split path we widen this market's
-/// caps directly (bypassing that placeholder), leaving everything else untouched.
+/// a tiny 500 MicroUsdc. Widen caps directly (bypassing that placeholder) so a test
+/// can open a large enough position to produce a non-zero fee and meaningful PnL.
 fn widen_market_caps(svm: &mut LiteSVM, market: &Pubkey, caps: TvlScaledCaps) {
     let mut account = svm.get_account(market).expect("market not found");
     let mut data = SynteticMarket::try_deserialize(&mut account.data.as_slice()).unwrap();
@@ -86,6 +79,12 @@ fn token_balance(svm: &LiteSVM, ata: &Pubkey) -> u64 {
     TokenAccount::try_deserialize(&mut account.data.as_slice())
         .unwrap()
         .amount
+}
+
+fn pool_total_assets(svm: &LiteSVM, pool: &Pubkey) -> u64 {
+    liquidity_pool::Pool::try_deserialize(&mut svm.get_account(pool).unwrap().data.as_slice())
+        .unwrap()
+        .total_assets
 }
 
 fn send_ix(svm: &mut LiteSVM, ix: Instruction, signers: &[&Keypair]) -> litesvm::types::TransactionResult {
@@ -197,6 +196,37 @@ fn make_initialize_pool_ix(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn make_deposit_ix(
+    lp_program_id: Pubkey,
+    provider: Pubkey,
+    pool: Pubkey,
+    provider_ata: Pubkey,
+    provider_lp_ata: Pubkey,
+    usdc_mint: Pubkey,
+    usdc_vault: Pubkey,
+    lp_mint: Pubkey,
+    amount: u64,
+) -> Instruction {
+    Instruction::new_with_bytes(
+        lp_program_id,
+        &liquidity_pool::instruction::Deposit { amount }.data(),
+        liquidity_pool::accounts::Deposit {
+            provider,
+            pool,
+            provider_ata,
+            provider_lp_ata,
+            usdc_mint,
+            usdc_vault,
+            lp_mint,
+            token_program: anchor_spl::token::ID,
+            associated_token_program: anchor_spl::associated_token::ID,
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
 fn make_open_position_ix(
     program_id: Pubkey,
     lp_program_id: Pubkey,
@@ -236,12 +266,50 @@ fn make_open_position_ix(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
+fn make_close_position_ix(
+    program_id: Pubkey,
+    lp_program_id: Pubkey,
+    trader: Pubkey,
+    price_update: Pubkey,
+    global_config: Pubkey,
+    position: Pubkey,
+    market_vault: Pubkey,
+    market: Pubkey,
+    lp_pool: Pubkey,
+    lp_pool_usdc_vault: Pubkey,
+    fee_receiver_ata: Pubkey,
+    trader_usdc_ata: Pubkey,
+    usdc_mint: Pubkey,
+) -> Instruction {
+    Instruction::new_with_bytes(
+        program_id,
+        &perp::instruction::ClosePosition {}.data(),
+        perp::accounts::ClosePosition {
+            trader,
+            price_update,
+            global_config,
+            position,
+            market_vault,
+            market,
+            lp_pool,
+            lp_pool_usdc_vault,
+            lp_pool_program: lp_program_id,
+            fee_receiver_ata,
+            trader_usdc_ata,
+            usdc_mint,
+            token_program: anchor_spl::token::ID,
+        }
+        .to_account_metas(None),
+    )
+}
+
 // --- fabricated Pyth price account -----------------------------------------
 
-/// Builds a `PriceUpdateV2` account by hand and injects it into LiteSVM via
-/// `set_account`, so `_open_position`'s `get_price_no_older_than` call succeeds
-/// without running the real Pyth receiver program on-chain. Uses the SVM's own
-/// current clock as `publish_time` so the 30s freshness check always passes.
+/// Builds a `PriceUpdateV2` account by hand and injects it into LiteSVM, so
+/// `get_price_no_older_than` succeeds without running the real Pyth receiver
+/// program on-chain. Uses the SVM's own current clock as `publish_time` so the
+/// 30s freshness check always passes.
 fn fabricate_price_update(svm: &mut LiteSVM, price: i64) -> Pubkey {
     let feed_id = get_feed_id_from_hex(FEED_ID_HEX).unwrap();
     let publish_time = svm.get_sysvar::<anchor_lang::solana_program::clock::Clock>().unix_timestamp;
@@ -283,7 +351,6 @@ fn fabricate_price_update(svm: &mut LiteSVM, price: i64) -> Pubkey {
 
 // --- environment setup -------------------------------------------------------
 
-/// Bundle of everything a test needs to fire an `open_position` ix.
 struct Env {
     svm: LiteSVM,
     trader: Keypair,
@@ -294,9 +361,11 @@ struct Env {
     market_vault: Pubkey,
     lp_pool: Pubkey,
     lp_pool_usdc_vault: Pubkey,
+    lp_mint: Pubkey,
     usdc_mint: Pubkey,
     trader_usdc_ata: Pubkey,
     fee_receiver_ata: Pubkey,
+    payer: Keypair,
 }
 
 fn setup() -> Env {
@@ -347,8 +416,8 @@ fn setup() -> Env {
     send_ix(&mut svm, init_market_ix, &[&payer]).unwrap();
 
     // lp_pool — perp_program must be market_vault's address: that's the account
-    // that actually signs the credit CPI (via invoke_signed on its own PDA seeds),
-    // not the perp program id itself. See liquidity_pool::instructions::credit.
+    // that actually signs the credit/debit CPI (via invoke_signed on its own PDA
+    // seeds), not the perp program id itself. See liquidity_pool::instructions::credit.
     let lp_pool = lp_pool_pda(&lp_program_id);
     let lp_pool_usdc_vault = lp_usdc_vault_pda(&lp_program_id);
     let lp_mint = lp_mint_pda(&lp_program_id);
@@ -387,41 +456,48 @@ fn setup() -> Env {
         market_vault,
         lp_pool,
         lp_pool_usdc_vault,
+        lp_mint,
         usdc_mint,
         trader_usdc_ata,
         fee_receiver_ata,
+        payer,
     }
 }
 
-// --- tests -------------------------------------------------------------------
+/// Funds the LP pool's vault with `amount` USDC from a fresh depositor, so a
+/// close_position test can exercise the `debit` (pool pays trader) path.
+fn fund_pool(env: &mut Env, amount: u64) {
+    let provider = Keypair::new();
+    env.svm.airdrop(&provider.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
 
-#[test]
-fn test_open_position_ok() {
-    let mut env = setup();
-    let price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00 @ -8 exponent
+    let provider_ata = CreateAssociatedTokenAccount::new(&mut env.svm, &env.payer, &env.usdc_mint)
+        .owner(&provider.pubkey())
+        .send()
+        .unwrap();
+    MintTo::new(&mut env.svm, &env.payer, &env.usdc_mint, &provider_ata, amount)
+        .send()
+        .unwrap();
 
+    let provider_lp_ata = anchor_spl::associated_token::get_associated_token_address(&provider.pubkey(), &env.lp_mint);
+
+    let deposit_ix = make_deposit_ix(
+        env.lp_program_id,
+        provider.pubkey(),
+        env.lp_pool,
+        provider_ata,
+        provider_lp_ata,
+        env.usdc_mint,
+        env.lp_pool_usdc_vault,
+        env.lp_mint,
+        amount,
+    );
+    let res = send_ix(&mut env.svm, deposit_ix, &[&provider]);
+    assert!(res.is_ok(), "deposit failed: {:?}", res.err());
+}
+
+/// Opens a position for `env.trader` and returns its PDA.
+fn open(env: &mut Env, price_update: Pubkey, params: OpenPositionParams) -> Pubkey {
     let position = position_pda(&env.program_id, &env.trader.pubkey(), &env.market);
-    // Market caps are derived from initialize_market's hardcoded mock_lp_tvl = 50_000
-    // (MicroUsdc), which makes max_position_notional a tiny 500 MicroUsdc — so these
-    // amounts are deliberately small to stay under cap, not representative USDC sizes.
-    let params = OpenPositionParams {
-        leverage: 4,
-        margin: 100,
-        take_profit: 0,
-        stop_loss: 0,
-        position_type: PositionType::Long,
-    };
-
-    let trader_ata_before = token_balance(&env.svm, &env.trader_usdc_ata);
-    let market_vault_before = token_balance(&env.svm, &env.market_vault);
-    let fee_receiver_before = token_balance(&env.svm, &env.fee_receiver_ata);
-    let lp_vault_before = token_balance(&env.svm, &env.lp_pool_usdc_vault);
-    let lp_pool_assets_before = liquidity_pool::Pool::try_deserialize(
-        &mut env.svm.get_account(&env.lp_pool).unwrap().data.as_slice(),
-    )
-    .unwrap()
-    .total_assets;
-
     let ix = make_open_position_ix(
         env.program_id,
         env.lp_program_id,
@@ -440,47 +516,73 @@ fn test_open_position_ok() {
     );
     let res = send_ix(&mut env.svm, ix, &[&env.trader]);
     assert!(res.is_ok(), "open_position failed: {:?}", res.err());
-
-    let account = env.svm.get_account(&position).expect("position not found");
-    let data = perp::state::position::Position::try_deserialize(&mut account.data.as_slice()).unwrap();
-
-    assert_eq!(data.owner, env.trader.pubkey());
-    assert_eq!(data.market, env.market);
-    assert!(data.side == PositionType::Long);
-    assert_eq!(data.notional, 400); // margin(100) * leverage(4), fee floors to 0 at this size
-    assert_eq!(data.collateral, 100);
-    assert_eq!(data.entry_price, 100 * 1_000_000); // $100.00 in MicroUsdc
-
-    let market_account = env.svm.get_account(&env.market).unwrap();
-    let market_data = SynteticMarket::try_deserialize(&mut market_account.data.as_slice()).unwrap();
-    assert_eq!(market_data.oi_long, 400);
-    assert_eq!(market_data.oi_short, 0);
-
-    // Token movements. fee_to_pay is 0 at this notional (10bps of 400 floors to 0),
-    // so trader only ever loses the margin itself, and the fee-split legs (protocol
-    // + LP) are exercised as zero-amount transfers, not skipped — this does NOT
-    // prove the fee-split arithmetic is correct for a non-zero fee, only that the
-    // transfer wiring/authorities are right. See PR notes: max_position_notional is
-    // capped at 500 by initialize_market's hardcoded mock_lp_tvl, so no amount under
-    // that cap can produce fee >= 1 (needs notional >= 1000 for base_fee_bps=10).
-    assert_eq!(trader_ata_before - token_balance(&env.svm, &env.trader_usdc_ata), 100);
-    assert_eq!(token_balance(&env.svm, &env.market_vault) - market_vault_before, 100);
-    assert_eq!(token_balance(&env.svm, &env.fee_receiver_ata), fee_receiver_before);
-    assert_eq!(token_balance(&env.svm, &env.lp_pool_usdc_vault), lp_vault_before);
-
-    let lp_pool_assets_after = liquidity_pool::Pool::try_deserialize(
-        &mut env.svm.get_account(&env.lp_pool).unwrap().data.as_slice(),
-    )
-    .unwrap()
-    .total_assets;
-    assert_eq!(lp_pool_assets_after, lp_pool_assets_before);
+    position
 }
 
-/// Same setup, but with market caps widened so the trade actually produces a
-/// non-zero fee, so we can verify the protocol/LP fee split actually lands in
-/// the right accounts for the right amounts (not just that the transfers no-op).
+// --- tests -------------------------------------------------------------------
+
+/// Same entry and exit price -> zero PnL, and the position is small enough that
+/// the flat close fee floors to zero too. Trader should get exactly their
+/// collateral back, nothing should touch the LP pool, and the position account
+/// should be closed (rent refunded).
 #[test]
-fn test_open_position_distributes_fees() {
+fn test_close_position_breakeven() {
+    let mut env = setup();
+    let price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
+
+    let position = open(&mut env, price_update, OpenPositionParams {
+        leverage: 4,
+        margin: 100,
+        take_profit: 0,
+        stop_loss: 0,
+        position_type: PositionType::Long,
+    });
+
+    let trader_before = token_balance(&env.svm, &env.trader_usdc_ata);
+    let vault_before = token_balance(&env.svm, &env.market_vault);
+    let lp_vault_before = token_balance(&env.svm, &env.lp_pool_usdc_vault);
+    let pool_assets_before = pool_total_assets(&env.svm, &env.lp_pool);
+
+    let close_ix = make_close_position_ix(
+        env.program_id,
+        env.lp_program_id,
+        env.trader.pubkey(),
+        price_update,
+        env.global_config,
+        position,
+        env.market_vault,
+        env.market,
+        env.lp_pool,
+        env.lp_pool_usdc_vault,
+        env.fee_receiver_ata,
+        env.trader_usdc_ata,
+        env.usdc_mint,
+    );
+    let res = send_ix(&mut env.svm, close_ix, &[&env.trader]);
+    assert!(res.is_ok(), "close_position failed: {:?}", res.err());
+
+    // Trader gets their full collateral back (100), vault drains by exactly that,
+    // and the pool/fee receiver are untouched since fee floored to 0.
+    assert_eq!(token_balance(&env.svm, &env.trader_usdc_ata) - trader_before, 100);
+    assert_eq!(vault_before - token_balance(&env.svm, &env.market_vault), 100);
+    assert_eq!(token_balance(&env.svm, &env.lp_pool_usdc_vault), lp_vault_before);
+    assert_eq!(pool_total_assets(&env.svm, &env.lp_pool), pool_assets_before);
+
+    let market_data = SynteticMarket::try_deserialize(
+        &mut env.svm.get_account(&env.market).unwrap().data.as_slice(),
+    )
+    .unwrap();
+    assert_eq!(market_data.oi_long, 0);
+
+    let closed = env.svm.get_account(&position).map(|a| a.lamports).unwrap_or(0);
+    assert_eq!(closed, 0, "position account should be closed / drained");
+}
+
+/// A 10% adverse price move against 10x leverage wipes the position out exactly.
+/// Trader should get nothing back, and the vault's entire remaining collateral
+/// (after the close fee split) should be credited to the LP pool.
+#[test]
+fn test_close_position_full_loss_credits_pool() {
     let mut env = setup();
     widen_market_caps(
         &mut env.svm,
@@ -490,45 +592,38 @@ fn test_open_position_distributes_fees() {
             max_user_notional: 1_000_000_000,
             max_oi_long: 1_000_000_000,
             max_oi_short: 1_000_000_000,
-            max_skew: 20_000_000, // small relative to notional below, so skew_fee also kicks in
+            max_skew: 20_000_000,
         },
     );
-    let price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00 @ -8 exponent
+    let open_price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
 
-    let position = position_pda(&env.program_id, &env.trader.pubkey(), &env.market);
-    // margin=1_000_000 (1 USDC), leverage=10 -> notional_before_fee=10_000_000.
-    // base_fee = 10bps of 10_000_000 = 10_000. Skew goes 0 -> 10_000_000 against a
-    // 20_000_000 cap (worsens_skew=true), so skew_fee = 10_000_000/20_000_000 * 20bps
-    // of notional = 10bps of 10_000_000 = 10_000. total fee = 20_000.
-    // protocol_fees = 15% of 20_000 = 3_000, lp_fees = 17_000.
-    let params = OpenPositionParams {
+    // margin=1_000_000, leverage=10 -> open fee 20_000 (base+skew), collateral 980_000,
+    // notional 9_800_000. Matches test_open_position_distributes_fees's math.
+    let position = open(&mut env, open_price_update, OpenPositionParams {
         leverage: 10,
         margin: 1_000_000,
         take_profit: 0,
         stop_loss: 0,
         position_type: PositionType::Long,
-    };
-    let margin = params.margin;
-    let expected_fee = 20_000u64;
-    let expected_protocol_fee = 3_000u64;
-    let expected_lp_fee = 17_000u64;
-    let expected_collateral = margin - expected_fee;
+    });
 
-    let trader_ata_before = token_balance(&env.svm, &env.trader_usdc_ata);
-    let market_vault_before = token_balance(&env.svm, &env.market_vault);
+    // close_fee = 10bps of notional 9_800_000 = 9_800 -> protocol 1_470 / lp 8_330.
+    // collateral_after_fee = 980_000 - 9_800 = 970_200.
+    // -10% move: pnl = -10_000_000/100_000_000 * 9_800_000 = -980_000, which wipes
+    // out even the pre-fee collateral, so payout=0 and the pool eats the rest.
+    let close_price_update = fabricate_price_update(&mut env.svm, 90_00_000_000); // $90.00
+
+    let trader_before = token_balance(&env.svm, &env.trader_usdc_ata);
+    let vault_before = token_balance(&env.svm, &env.market_vault);
     let fee_receiver_before = token_balance(&env.svm, &env.fee_receiver_ata);
     let lp_vault_before = token_balance(&env.svm, &env.lp_pool_usdc_vault);
-    let lp_pool_assets_before = liquidity_pool::Pool::try_deserialize(
-        &mut env.svm.get_account(&env.lp_pool).unwrap().data.as_slice(),
-    )
-    .unwrap()
-    .total_assets;
+    let pool_assets_before = pool_total_assets(&env.svm, &env.lp_pool);
 
-    let ix = make_open_position_ix(
+    let close_ix = make_close_position_ix(
         env.program_id,
         env.lp_program_id,
         env.trader.pubkey(),
-        price_update,
+        close_price_update,
         env.global_config,
         position,
         env.market_vault,
@@ -538,51 +633,125 @@ fn test_open_position_distributes_fees() {
         env.fee_receiver_ata,
         env.trader_usdc_ata,
         env.usdc_mint,
-        params,
     );
-    let res = send_ix(&mut env.svm, ix, &[&env.trader]);
-    assert!(res.is_ok(), "open_position failed: {:?}", res.err());
+    let res = send_ix(&mut env.svm, close_ix, &[&env.trader]);
+    assert!(res.is_ok(), "close_position failed: {:?}", res.err());
 
-    let account = env.svm.get_account(&position).expect("position not found");
-    let data = perp::state::position::Position::try_deserialize(&mut account.data.as_slice()).unwrap();
-    assert_eq!(data.owner, env.trader.pubkey());
-    assert_eq!(data.market, env.market);
-    assert!(data.side == PositionType::Long);
-    assert_eq!(data.entry_price, 100 * 1_000_000);
-    assert_eq!(data.collateral, expected_collateral);
-    assert_eq!(data.notional, expected_collateral * 10);
+    let expected_protocol_fee = 1_470u64;
+    let expected_lp_fee = 8_330u64;
+    let expected_credit_to_pool = 970_200u64;
 
-    let market_account = env.svm.get_account(&env.market).unwrap();
-    let market_data = SynteticMarket::try_deserialize(&mut market_account.data.as_slice()).unwrap();
-    assert_eq!(market_data.oi_long, expected_collateral * 10);
-    assert_eq!(market_data.oi_short, 0);
-
-    // Trader's transfers cover collateral + both fee cuts: transfer_margin_to_vault
-    // sends (margin + lp_fee) so the vault can forward lp_fee on to the pool via
-    // credit_lp_pool while still being left holding exactly `margin`, and
-    // transfer_protocol_fee sends protocol_fees directly. Total trader outflow is
-    // therefore the full original margin.
-    assert_eq!(
-        trader_ata_before - token_balance(&env.svm, &env.trader_usdc_ata),
-        margin
-    );
-    assert_eq!(
-        token_balance(&env.svm, &env.market_vault) - market_vault_before,
-        expected_collateral
-    );
+    // Trader receives nothing.
+    assert_eq!(token_balance(&env.svm, &env.trader_usdc_ata), trader_before);
+    // Vault drains by exactly the position's remaining collateral (980_000 total:
+    // fee split + full loss credit), leaving no leftover or shortfall.
+    assert_eq!(vault_before - token_balance(&env.svm, &env.market_vault), 980_000);
     assert_eq!(
         token_balance(&env.svm, &env.fee_receiver_ata) - fee_receiver_before,
         expected_protocol_fee
     );
     assert_eq!(
         token_balance(&env.svm, &env.lp_pool_usdc_vault) - lp_vault_before,
-        expected_lp_fee
+        expected_lp_fee + expected_credit_to_pool
     );
+    assert_eq!(
+        pool_total_assets(&env.svm, &env.lp_pool) - pool_assets_before,
+        expected_lp_fee + expected_credit_to_pool
+    );
+}
 
-    let lp_pool_assets_after = liquidity_pool::Pool::try_deserialize(
-        &mut env.svm.get_account(&env.lp_pool).unwrap().data.as_slice(),
-    )
-    .unwrap()
-    .total_assets;
-    assert_eq!(lp_pool_assets_after - lp_pool_assets_before, expected_lp_fee);
+/// A +10% favorable move produces profit bigger than the trader's own collateral
+/// could cover, so the pool must fund the excess via `debit`. This is the
+/// regression test for the double-payment bug: the vault must pay only its own
+/// share (collateral_after_fee), not the full payout, or the trader gets paid
+/// twice and the vault gets over-drained.
+#[test]
+fn test_close_position_profit_funded_by_pool() {
+    let mut env = setup();
+    widen_market_caps(
+        &mut env.svm,
+        &env.market,
+        TvlScaledCaps {
+            max_position_notional: 1_000_000_000,
+            max_user_notional: 1_000_000_000,
+            max_oi_long: 1_000_000_000,
+            max_oi_short: 1_000_000_000,
+            max_skew: 20_000_000,
+        },
+    );
+    // Seed the pool with enough liquidity to cover the payout below (980_000).
+    fund_pool(&mut env, 5_000_000);
+
+    let open_price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
+    let position = open(&mut env, open_price_update, OpenPositionParams {
+        leverage: 10,
+        margin: 1_000_000,
+        take_profit: 0,
+        stop_loss: 0,
+        position_type: PositionType::Long,
+    });
+
+    // close_fee = 9_800 -> protocol 1_470 / lp 8_330. collateral_after_fee = 970_200.
+    // +10% move: pnl = +980_000. net = 970_200 + 980_000 = 1_950_200, which exceeds
+    // collateral_after_fee, so debit_from_pool = 1_950_200 - 970_200 = 980_000 and
+    // the vault only ever pays out its own 970_200 share.
+    let close_price_update = fabricate_price_update(&mut env.svm, 110_00_000_000); // $110.00
+
+    let trader_before = token_balance(&env.svm, &env.trader_usdc_ata);
+    let vault_before = token_balance(&env.svm, &env.market_vault);
+    let fee_receiver_before = token_balance(&env.svm, &env.fee_receiver_ata);
+    let lp_vault_before = token_balance(&env.svm, &env.lp_pool_usdc_vault);
+    let pool_assets_before = pool_total_assets(&env.svm, &env.lp_pool);
+
+    let close_ix = make_close_position_ix(
+        env.program_id,
+        env.lp_program_id,
+        env.trader.pubkey(),
+        close_price_update,
+        env.global_config,
+        position,
+        env.market_vault,
+        env.market,
+        env.lp_pool,
+        env.lp_pool_usdc_vault,
+        env.fee_receiver_ata,
+        env.trader_usdc_ata,
+        env.usdc_mint,
+    );
+    let res = send_ix(&mut env.svm, close_ix, &[&env.trader]);
+    assert!(res.is_ok(), "close_position failed: {:?}", res.err());
+
+    let expected_protocol_fee = 1_470u64;
+    let expected_lp_fee = 8_330u64;
+    let expected_vault_payout = 970_200u64;
+    let expected_debit_from_pool = 980_000u64;
+    let expected_total_payout = expected_vault_payout + expected_debit_from_pool; // 1_950_200
+
+    // Trader receives exactly the total payout — not more (the bug would have
+    // added an extra 980_000 on top by also paying the full `payout` from the vault).
+    assert_eq!(
+        token_balance(&env.svm, &env.trader_usdc_ata) - trader_before,
+        expected_total_payout
+    );
+    // Vault only loses its own share: the fee split plus the trader's own collateral,
+    // never the pool-funded profit portion.
+    assert_eq!(
+        vault_before - token_balance(&env.svm, &env.market_vault),
+        expected_protocol_fee + expected_lp_fee + expected_vault_payout
+    );
+    assert_eq!(
+        token_balance(&env.svm, &env.fee_receiver_ata) - fee_receiver_before,
+        expected_protocol_fee
+    );
+    // Pool vault: +lp_fee from the close-fee credit, -debit_from_pool paid to trader.
+    let lp_vault_after = token_balance(&env.svm, &env.lp_pool_usdc_vault);
+    assert_eq!(
+        lp_vault_before + expected_lp_fee - lp_vault_after,
+        expected_debit_from_pool
+    );
+    let pool_assets_after = pool_total_assets(&env.svm, &env.lp_pool);
+    assert_eq!(
+        pool_assets_before + expected_lp_fee - pool_assets_after,
+        expected_debit_from_pool
+    );
 }

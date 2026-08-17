@@ -18,6 +18,7 @@ declare_id!("FWmruxC6TfBGZyXbQtzNjjJVrYMzRWLsTr6iscs9bkyK");
 #[program]
 pub mod perp {
     use crate::initialize_market::_initialize_market;
+    use crate::close_position::_close_position;
 
 use super::*;
 
@@ -43,6 +44,10 @@ use super::*;
 
     pub fn open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) -> Result<()> {
         _open_position(ctx, o_params)
+    }
+
+    pub fn close_position(ctx: Context<ClosePosition>) -> Result<()> {
+        _close_position(ctx)
     }
 
     pub fn market_pause(ctx: Context<MarketPause>, is_active: bool) -> Result<()> {

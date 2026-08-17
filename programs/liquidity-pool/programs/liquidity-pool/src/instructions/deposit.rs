@@ -68,12 +68,17 @@ pub struct Deposit<'info> {
     #[account(mut)]
     pub provider: Signer<'info>,
 
+    // Boxed: Deposit validates 8 accounts (mint/token accounts for both USDC and
+    // LP shares plus init_if_needed) in one Anchor-generated try_accounts function,
+    // which overflows the 4KB BPF stack frame when this crate is pulled in as a CPI
+    // dependency by another program (e.g. perp). Boxing moves it to the heap. See
+    // the identical fix/comment on perp's OpenPosition::price_update.
     #[account(
         mut,
         seeds = [LIQUIDITY_POOL_SEED],
         bump = pool.bump,
     )]
-    pub pool: Account<'info, Pool>,
+    pub pool: Box<Account<'info, Pool>>,
 
     #[account(
         mut,
