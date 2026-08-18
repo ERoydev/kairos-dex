@@ -26,4 +26,12 @@ pub enum PerpError {
     PositionExceedsMaxNotional,
     #[msg("Trade would exceed the market's open interest cap for this side")]
     OpenInterestCapExceeded,
+    #[msg("Oracle price exponent did not match the expected scale")]
+    UnexpectedOracleExponent,
+    #[msg("Oracle returned a non-positive price")]
+    InvalidOraclePrice,
+    #[msg("Specified leverage is out of bounds")]
+    LeverageOutOfBounds,
+    #[msg("Cannot calculate Open Fee on Close Position")]
+    CannotCalculateOpenFeeOnClosePosition,
 }

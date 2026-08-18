@@ -1,46 +1,86 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked};
-use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, get_feed_id_from_hex};
+use anchor_spl::token_interface::{
+    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
+};
+use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
-use crate::{alliases::MicroUsdc, events::PositionOpened, global::GlobalConfig, position::{Position, PositionType}, syntetic_market::SynteticMarket, utils::{fee_model::{calculate_trade_fee, worsens_skew}, projected_skew}, PerpError, MARKET_VAULT, POSITION_SEED};
+use crate::{
+    alliases::MicroUsdc,
+    events::PositionOpened,
+    global::GlobalConfig,
+    oracle::convert_price_to_micro_usdc,
+    position::{Position, PositionType},
+    syntetic_market::SynteticMarket,
+    utils::{fee_model::FeeModel, skew::Skew},
+    PerpError, MARKET_VAULT, POSITION_SEED, PYTH_MAX_PRICE_AGE_SECONDS,
+};
 
 // This imports the credit function and Credit accounts struct from liquidity-pool
 // #program macro auto-generates a cpi module gated behind feature `cpi`, containing wrapper fn per ix plus a matching cpi::accounts::* struct for each.
 use liquidity_pool::Pool;
 
 pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) -> Result<()> {
+    require!(ctx.accounts.market.is_active, PerpError::MarketPaused);
+
     let market = &ctx.accounts.market;
     let price_update = &mut ctx.accounts.price_update;
     let is_long = o_params.position_type == PositionType::Long;
     let fee_schedule = &market.risk_management.fee_schedule;
     let trader = &ctx.accounts.trader;
 
-    require!(market.is_active, PerpError::MarketPaused);
-    
-    // get_price_no_older_than will fail if the price update is more than 30 seconds old
-    let maximum_age: u64 = 30;
+    require!(
+        market.risk_management.max_leverage >= o_params.leverage,
+        PerpError::LeverageOutOfBounds
+    );
 
     // Read oracle price
     let feed_id: [u8; 32] = get_feed_id_from_hex(&market.feed_id)?;
-    let price = price_update.get_price_no_older_than(&Clock::get()?, maximum_age, &feed_id)?;
-    let asset_price: MicroUsdc = (price.price / 100) as u64; // exponent -8 -> 6 decimals
+    let price = price_update.get_price_no_older_than(
+        &Clock::get()?,
+        PYTH_MAX_PRICE_AGE_SECONDS,
+        &feed_id,
+    )?;
+    let asset_price: MicroUsdc = convert_price_to_micro_usdc(&price)?;
 
-    // Position_size 
-    let notional_before_fee: MicroUsdc = o_params.margin.checked_mul(o_params.leverage).ok_or(PerpError::MathOverflow)?;
+    // Position_size
+    let notional_before_fee: MicroUsdc = o_params
+        .margin
+        .checked_mul(o_params.leverage.into())
+        .ok_or(PerpError::MathOverflow)?;
 
     // Observe imbalances that this trade can cause
-    let projected_skew: MicroUsdc = projected_skew(&market.oi_long, &market.oi_short, &notional_before_fee, is_long);
+    let skew_model = Skew::new(
+        &market.oi_long,
+        &market.oi_short,
+        &notional_before_fee,
+        is_long,
+    );
+    let projected_skew = skew_model.projected_skew();
     // TODO: This require should be done after we got the final position_size after fees, but i leave it there until i refactor the code to avoid dublication
-    require!(market.risk_management.caps.max_skew > projected_skew, PerpError::MaxSkewLimitExceeded);
+    require!(
+        market.risk_management.caps.max_skew > projected_skew,
+        PerpError::MaxSkewLimitExceeded
+    );
 
-    let worsens_skew = worsens_skew(&market.oi_long, &market.oi_short, &notional_before_fee, is_long);
+    let worsens_skew = skew_model.worsens_skew();
 
     // calculate fee
-    let fee_to_pay: MicroUsdc = calculate_trade_fee(&notional_before_fee, fee_schedule, projected_skew, market.risk_management.caps.max_skew, worsens_skew);
+    let fee_model = FeeModel::new(
+        &notional_before_fee,
+        fee_schedule,
+        Some(&projected_skew),
+        Some(&market.risk_management.caps.max_skew),
+    );
+    let fee_to_pay = fee_model.calculate_trade_fee(worsens_skew)?;
 
     // deduct fee from margin and get final values that we work with
-    let margin = o_params.margin.checked_sub(fee_to_pay).ok_or(PerpError::MathOverflow)?;
-    let position_size: MicroUsdc = margin.checked_mul(o_params.leverage).ok_or(PerpError::MathOverflow)?;
+    let margin = o_params
+        .margin
+        .checked_sub(fee_to_pay)
+        .ok_or(PerpError::MathOverflow)?;
+    let position_size: MicroUsdc = margin
+        .checked_mul(o_params.leverage.into())
+        .ok_or(PerpError::MathOverflow)?;
 
     // Cap: single position notional
     require!(
@@ -49,14 +89,21 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
     );
 
     // Cap: gross open interest for this side
-    let (new_oi, oi_cap) = SynteticMarket::calc_open_interest(is_long, position_size, market.oi_long, market.oi_short, market.risk_management.caps.max_oi_long, market.risk_management.caps.max_oi_short)?;
+    let (new_oi, oi_cap) = SynteticMarket::calc_open_interest(
+        is_long,
+        position_size,
+        market.oi_long,
+        market.oi_short,
+        market.risk_management.caps.max_oi_long,
+        market.risk_management.caps.max_oi_short,
+    )?;
     require!(new_oi <= oi_cap, PerpError::OpenInterestCapExceeded);
 
     // TODO: max_user_notional isn't enforced here yet — there's no per-user
     // aggregate exposure tracked across a trader's positions in this market.
 
     // Distribute fees
-    let (protocol_fees, lp_fees): (MicroUsdc, MicroUsdc) = SynteticMarket::calc_distributed_fees(fee_to_pay)?;
+    let (protocol_fees, lp_fees): (MicroUsdc, MicroUsdc) = fee_model.calc_distributed_fees(fee_to_pay)?;
 
     // Settle funds. credit_lp_pool's CPI can only pull from an account market_vault
     // itself controls (its `source` authority must be the signing `caller`), so
@@ -65,12 +112,14 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
     // up front — depositing only `margin` here would leave the vault short by
     // lp_fees the moment credit_lp_pool forwards it out below, understating what's
     // actually backing `position.collateral` for every future payout.
-    ctx.accounts.transfer_margin_to_vault(margin.checked_add(lp_fees).ok_or(PerpError::MathOverflow)?)?;
+    ctx.accounts
+        .transfer_margin_to_vault(margin.checked_add(lp_fees).ok_or(PerpError::MathOverflow)?)?;
     ctx.accounts.transfer_protocol_fee(protocol_fees)?;
-    ctx.accounts.credit_lp_pool(lp_fees, ctx.bumps.market_vault)?;
+    ctx.accounts
+        .credit_lp_pool(lp_fees, ctx.bumps.market_vault)?;
 
     let market_key = market.key();
-    let entry_funding_index = market.funding_fees.cumulative_funding_index_bps;
+    let entry_funding_index_bps = market.funding_fees.cumulative_funding_index_bps;
 
     // Create Position
     let position = &mut ctx.accounts.position;
@@ -82,7 +131,7 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
     position.notional = position_size;
     position.entry_price = asset_price;
     position.opened_at = Clock::get()?.unix_timestamp;
-    position.entry_funding_index = entry_funding_index;
+    position.entry_funding_index_bps = entry_funding_index_bps;
 
     // Update Market open interest
     let market = &mut ctx.accounts.market;
@@ -96,12 +145,11 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
         position: position.key(),
         trader: trader.key(),
         oracle_price: asset_price,
-        entry_funding_index,
+        entry_funding_index_bps,
     });
 
     Ok(())
 }
-
 
 #[derive(Accounts)]
 pub struct OpenPosition<'info> {
@@ -203,7 +251,8 @@ impl<'info> OpenPosition<'info> {
     /// `transfer_margin_to_vault`, since it draws from market_vault's own balance.
     pub fn credit_lp_pool(&self, amount: MicroUsdc, market_vault_bump: u8) -> Result<()> {
         let market_key = self.market.key();
-        let vault_seeds: &[&[&[u8]]] = &[&[MARKET_VAULT, market_key.as_ref(), &[market_vault_bump]]];
+        let vault_seeds: &[&[&[u8]]] =
+            &[&[MARKET_VAULT, market_key.as_ref(), &[market_vault_bump]]];
 
         let cpi_accounts = liquidity_pool::cpi::accounts::Credit {
             caller: self.market_vault.to_account_info(),
@@ -213,18 +262,15 @@ impl<'info> OpenPosition<'info> {
             usdc_vault: self.lp_pool_usdc_vault.to_account_info(),
             token_program: self.token_program.to_account_info(),
         };
-        let cpi_ctx = CpiContext::new_with_signer(
-            self.lp_pool_program.key(),
-            cpi_accounts,
-            vault_seeds,
-        );
+        let cpi_ctx =
+            CpiContext::new_with_signer(self.lp_pool_program.key(), cpi_accounts, vault_seeds);
         liquidity_pool::cpi::credit(cpi_ctx, amount)
     }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct OpenPositionParams {
-    pub leverage: u64,
+    pub leverage: u16,
     pub margin: u64,
     pub take_profit: u64,
     pub stop_loss: u64,
@@ -244,9 +290,8 @@ mod tests {
         let feed_id_hex = "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43";
         let feed_id: [u8; 32] = get_feed_id_from_hex(feed_id_hex).unwrap();
 
-        let url = format!(
-            "https://hermes.pyth.network/v2/updates/price/latest?ids[]={feed_id_hex}"
-        );
+        let url =
+            format!("https://hermes.pyth.network/v2/updates/price/latest?ids[]={feed_id_hex}");
         let output = std::process::Command::new("curl")
             .args(["-s", "--max-time", "10", &url])
             .output()
@@ -255,7 +300,9 @@ mod tests {
 
         // Pull the top-level "price": { ... } object out of the raw JSON response.
         let key = "\"price\":{";
-        let idx = body.find(key).unwrap_or_else(|| panic!("no price field in response: {body}"))
+        let idx = body
+            .find(key)
+            .unwrap_or_else(|| panic!("no price field in response: {body}"))
             + key.len();
         let inner = &body[idx..];
         let inner = &inner[..inner.find('}').unwrap()];

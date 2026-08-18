@@ -3,6 +3,7 @@ pub mod constants;
 pub mod error;
 pub mod events;
 pub mod instructions;
+pub mod oracle;
 pub mod state;
 pub mod utils;
 
@@ -11,16 +12,17 @@ use anchor_lang::prelude::*;
 pub use constants::*;
 pub use error::*;
 pub use instructions::*;
+pub use oracle::*;
 pub use state::*;
 
 declare_id!("FWmruxC6TfBGZyXbQtzNjjJVrYMzRWLsTr6iscs9bkyK");
 
 #[program]
 pub mod perp {
-    use crate::initialize_market::_initialize_market;
     use crate::close_position::_close_position;
+    use crate::initialize_market::_initialize_market;
 
-use super::*;
+    use super::*;
 
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,

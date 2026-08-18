@@ -1,15 +1,21 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked};
-use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, get_feed_id_from_hex};
+use anchor_spl::token_interface::{
+    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
+};
+use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
 use crate::{
     alliases::MicroUsdc,
     events::PositionClosed,
     global::GlobalConfig,
+    oracle::convert_price_to_micro_usdc,
     position::{Position, PositionType},
     syntetic_market::SynteticMarket,
-    utils::{fee_model::calculate_base_fee, pnl::{apply_funding, calculate_pnl, settle}},
-    MARKET_VAULT, POSITION_SEED,
+    utils::{
+        fee_model::FeeModel,
+        pnl::{apply_funding, calculate_pnl, settle},
+    },
+    MARKET_VAULT, POSITION_SEED, PYTH_MAX_PRICE_AGE_SECONDS,
 };
 
 use liquidity_pool::Pool;
@@ -20,50 +26,69 @@ pub fn _close_position(ctx: Context<ClosePosition>) -> Result<()> {
     let market = &ctx.accounts.market;
     let position = &ctx.accounts.position;
 
-    let maximum_age: u64 = 30;
     let feed_id: [u8; 32] = get_feed_id_from_hex(&market.feed_id)?;
-    let price = ctx.accounts.price_update.get_price_no_older_than(&Clock::get()?, maximum_age, &feed_id)?;
-    let exit_price: MicroUsdc = (price.price / 100) as u64; // exponent -8 -> 6 decimals
+    let price = ctx.accounts.price_update.get_price_no_older_than(
+        &Clock::get()?,
+        PYTH_MAX_PRICE_AGE_SECONDS,
+        &feed_id,
+    )?;
+    let exit_price: MicroUsdc = convert_price_to_micro_usdc(&price)?;
 
     // Settle funding accrued since the position was opened
     let collateral = apply_funding(
         position.side,
         position.collateral,
         position.notional,
-        position.entry_funding_index,
+        position.entry_funding_index_bps,
         market.funding_fees.cumulative_funding_index_bps,
     );
 
-    let pnl = calculate_pnl(position.side, position.entry_price, exit_price, position.notional);
+    let pnl = calculate_pnl(
+        position.side,
+        position.entry_price,
+        exit_price,
+        position.notional,
+    );
 
     // Close fee, same flat schedule charged on open. Capped at collateral so we
     // never try to move more out of the vault than this position actually owns.
-    let close_fee = calculate_base_fee(&position.notional, market.risk_management.fee_schedule.base_fee_bps as u64)
-        .min(collateral);
+    let fee_model = FeeModel::new(
+        &position.notional,
+        &market.risk_management.fee_schedule,
+        None,
+        None,
+    );
+    // TODO: This is wrong i risk to lose fee if the funding have eaten most of the collateral, so protocol can collect little or no close fee on that position.
+    // Here i just have protection against underflow
+    let close_fee = fee_model.calculate_base_fee(None)?.min(collateral);
     let collateral_after_fee = collateral - close_fee;
 
     // (amount_to_pay_trader, credit_amount_to_pool, debit_amount_from_pool)
     let (payout, credit_to_pool, debit_from_pool) = settle(collateral_after_fee, pnl, 0);
-    let (protocol_fee, lp_fee) = SynteticMarket::calc_distributed_fees(close_fee)?;
+    let (protocol_fees, lp_fees): (MicroUsdc, MicroUsdc) = fee_model.calc_distributed_fees(close_fee)?;
 
     let market_vault_bump = ctx.bumps.market_vault;
 
     // Peel the close fee out of the vault first, same 15/85 split as on open.
-    ctx.accounts.transfer_protocol_fee(protocol_fee, market_vault_bump)?;
-    ctx.accounts.credit_lp_pool(lp_fee, market_vault_bump)?;
+    ctx.accounts
+        .transfer_protocol_fee(protocol_fees, market_vault_bump)?;
+    ctx.accounts.credit_lp_pool(lp_fees, market_vault_bump)?;
 
     // Then settle the trade itself between trader, vault and pool.
     // `payout` is the trader's *total* due; when it's pool-funded (debit_from_pool > 0)
     // that slice comes straight from the pool below, so the vault only owes the rest.
     let vault_payout = payout - debit_from_pool;
     if vault_payout > 0 {
-        ctx.accounts.transfer_to_trader(vault_payout, market_vault_bump)?;
+        ctx.accounts
+            .transfer_to_trader(vault_payout, market_vault_bump)?;
     }
     if credit_to_pool > 0 {
-        ctx.accounts.credit_lp_pool(credit_to_pool, market_vault_bump)?;
+        ctx.accounts
+            .credit_lp_pool(credit_to_pool, market_vault_bump)?;
     }
     if debit_from_pool > 0 {
-        ctx.accounts.debit_lp_pool(debit_from_pool, market_vault_bump)?;
+        ctx.accounts
+            .debit_lp_pool(debit_from_pool, market_vault_bump)?;
     }
 
     let market_key = market.key();
@@ -207,11 +232,8 @@ impl<'info> ClosePosition<'info> {
             usdc_vault: self.lp_pool_usdc_vault.to_account_info(),
             token_program: self.token_program.to_account_info(),
         };
-        let cpi_ctx = CpiContext::new_with_signer(
-            self.lp_pool_program.key(),
-            cpi_accounts,
-            vault_seeds,
-        );
+        let cpi_ctx =
+            CpiContext::new_with_signer(self.lp_pool_program.key(), cpi_accounts, vault_seeds);
         liquidity_pool::cpi::credit(cpi_ctx, amount)
     }
 
@@ -231,11 +253,8 @@ impl<'info> ClosePosition<'info> {
             usdc_mint: self.usdc_mint.to_account_info(),
             token_program: self.token_program.to_account_info(),
         };
-        let cpi_ctx = CpiContext::new_with_signer(
-            self.lp_pool_program.key(),
-            cpi_accounts,
-            vault_seeds,
-        );
+        let cpi_ctx =
+            CpiContext::new_with_signer(self.lp_pool_program.key(), cpi_accounts, vault_seeds);
         liquidity_pool::cpi::debit(cpi_ctx, amount)
     }
 }
