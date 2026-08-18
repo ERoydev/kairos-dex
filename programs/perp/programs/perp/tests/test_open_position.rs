@@ -40,7 +40,10 @@ use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
 
 use perp::{
-    state::{position::PositionType, syntetic_market::{SynteticMarket, TvlScaledCaps}},
+    state::{
+        position::PositionType,
+        syntetic_market::{SynteticMarket, TvlScaledCaps},
+    },
     OpenPositionParams, SMParams, GLOBAL_SEED, MARKET_SEED, MARKET_VAULT, POSITION_SEED,
 };
 
@@ -88,7 +91,11 @@ fn token_balance(svm: &LiteSVM, ata: &Pubkey) -> u64 {
         .amount
 }
 
-fn send_ix(svm: &mut LiteSVM, ix: Instruction, signers: &[&Keypair]) -> litesvm::types::TransactionResult {
+fn send_ix(
+    svm: &mut LiteSVM,
+    ix: Instruction,
+    signers: &[&Keypair],
+) -> litesvm::types::TransactionResult {
     let blockhash = svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&signers[0].pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), signers).unwrap();
@@ -110,11 +117,19 @@ fn market_vault_pda(program_id: &Pubkey, market: &Pubkey) -> Pubkey {
 }
 
 fn position_pda(program_id: &Pubkey, trader: &Pubkey, market: &Pubkey) -> Pubkey {
-    Pubkey::find_program_address(&[POSITION_SEED, trader.as_ref(), market.as_ref()], program_id).0
+    Pubkey::find_program_address(
+        &[POSITION_SEED, trader.as_ref(), market.as_ref()],
+        program_id,
+    )
+    .0
 }
 
 fn lp_pool_pda(lp_program_id: &Pubkey) -> Pubkey {
-    Pubkey::find_program_address(&[liquidity_pool::constants::LIQUIDITY_POOL_SEED], lp_program_id).0
+    Pubkey::find_program_address(
+        &[liquidity_pool::constants::LIQUIDITY_POOL_SEED],
+        lp_program_id,
+    )
+    .0
 }
 
 fn lp_usdc_vault_pda(lp_program_id: &Pubkey) -> Pubkey {
@@ -136,9 +151,17 @@ fn make_initialize_global_ix(
 ) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
-        &perp::instruction::InitializeGlobal { fee_receiver, max_markets }.data(),
-        perp::accounts::InitializeGlobal { payer, global_config, system_program: system_program::ID }
-            .to_account_metas(None),
+        &perp::instruction::InitializeGlobal {
+            fee_receiver,
+            max_markets,
+        }
+        .data(),
+        perp::accounts::InitializeGlobal {
+            payer,
+            global_config,
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
     )
 }
 
@@ -155,7 +178,11 @@ fn make_initialize_market_ix(
 ) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
-        &perp::instruction::InitializeMarket { symbol: sym, config }.data(),
+        &perp::instruction::InitializeMarket {
+            symbol: sym,
+            config,
+        }
+        .data(),
         perp::accounts::InitializeMarket {
             payer,
             global_config,
@@ -244,7 +271,9 @@ fn make_open_position_ix(
 /// current clock as `publish_time` so the 30s freshness check always passes.
 fn fabricate_price_update(svm: &mut LiteSVM, price: i64) -> Pubkey {
     let feed_id = get_feed_id_from_hex(FEED_ID_HEX).unwrap();
-    let publish_time = svm.get_sysvar::<anchor_lang::solana_program::clock::Clock>().unix_timestamp;
+    let publish_time = svm
+        .get_sysvar::<anchor_lang::solana_program::clock::Clock>()
+        .unix_timestamp;
 
     let price_update = PriceUpdateV2 {
         write_authority: Pubkey::default(),
@@ -304,12 +333,14 @@ fn setup() -> Env {
     let program_id = perp::id();
     let lp_program_id = liquidity_pool::id();
     svm.add_program(program_id, perp_bytes()).unwrap();
-    svm.add_program(lp_program_id, liquidity_pool_bytes()).unwrap();
+    svm.add_program(lp_program_id, liquidity_pool_bytes())
+        .unwrap();
 
     let payer = Keypair::new();
     svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
     let trader = Keypair::new();
-    svm.airdrop(&trader.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+    svm.airdrop(&trader.pubkey(), 10 * LAMPORTS_PER_SOL)
+        .unwrap();
 
     let usdc_mint = CreateMint::new(&mut svm, &payer)
         .authority(&payer.pubkey())
@@ -368,9 +399,15 @@ fn setup() -> Env {
         .owner(&trader.pubkey())
         .send()
         .unwrap();
-    MintTo::new(&mut svm, &payer, &usdc_mint, &trader_usdc_ata, 10_000 * 1_000_000)
-        .send()
-        .unwrap();
+    MintTo::new(
+        &mut svm,
+        &payer,
+        &usdc_mint,
+        &trader_usdc_ata,
+        10_000 * 1_000_000,
+    )
+    .send()
+    .unwrap();
 
     let fee_receiver_ata = CreateAssociatedTokenAccount::new(&mut svm, &payer, &usdc_mint)
         .owner(&fee_receiver)
@@ -442,7 +479,8 @@ fn test_open_position_ok() {
     assert!(res.is_ok(), "open_position failed: {:?}", res.err());
 
     let account = env.svm.get_account(&position).expect("position not found");
-    let data = perp::state::position::Position::try_deserialize(&mut account.data.as_slice()).unwrap();
+    let data =
+        perp::state::position::Position::try_deserialize(&mut account.data.as_slice()).unwrap();
 
     assert_eq!(data.owner, env.trader.pubkey());
     assert_eq!(data.market, env.market);
@@ -463,10 +501,22 @@ fn test_open_position_ok() {
     // transfer wiring/authorities are right. See PR notes: max_position_notional is
     // capped at 500 by initialize_market's hardcoded mock_lp_tvl, so no amount under
     // that cap can produce fee >= 1 (needs notional >= 1000 for base_fee_bps=10).
-    assert_eq!(trader_ata_before - token_balance(&env.svm, &env.trader_usdc_ata), 100);
-    assert_eq!(token_balance(&env.svm, &env.market_vault) - market_vault_before, 100);
-    assert_eq!(token_balance(&env.svm, &env.fee_receiver_ata), fee_receiver_before);
-    assert_eq!(token_balance(&env.svm, &env.lp_pool_usdc_vault), lp_vault_before);
+    assert_eq!(
+        trader_ata_before - token_balance(&env.svm, &env.trader_usdc_ata),
+        100
+    );
+    assert_eq!(
+        token_balance(&env.svm, &env.market_vault) - market_vault_before,
+        100
+    );
+    assert_eq!(
+        token_balance(&env.svm, &env.fee_receiver_ata),
+        fee_receiver_before
+    );
+    assert_eq!(
+        token_balance(&env.svm, &env.lp_pool_usdc_vault),
+        lp_vault_before
+    );
 
     let lp_pool_assets_after = liquidity_pool::Pool::try_deserialize(
         &mut env.svm.get_account(&env.lp_pool).unwrap().data.as_slice(),
@@ -544,7 +594,8 @@ fn test_open_position_distributes_fees() {
     assert!(res.is_ok(), "open_position failed: {:?}", res.err());
 
     let account = env.svm.get_account(&position).expect("position not found");
-    let data = perp::state::position::Position::try_deserialize(&mut account.data.as_slice()).unwrap();
+    let data =
+        perp::state::position::Position::try_deserialize(&mut account.data.as_slice()).unwrap();
     assert_eq!(data.owner, env.trader.pubkey());
     assert_eq!(data.market, env.market);
     assert!(data.side == PositionType::Long);
@@ -584,5 +635,8 @@ fn test_open_position_distributes_fees() {
     )
     .unwrap()
     .total_assets;
-    assert_eq!(lp_pool_assets_after - lp_pool_assets_before, expected_lp_fee);
+    assert_eq!(
+        lp_pool_assets_after - lp_pool_assets_before,
+        expected_lp_fee
+    );
 }

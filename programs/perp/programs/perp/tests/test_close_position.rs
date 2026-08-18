@@ -34,7 +34,10 @@ use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
 
 use perp::{
-    state::{position::PositionType, syntetic_market::{SynteticMarket, TvlScaledCaps}},
+    state::{
+        position::PositionType,
+        syntetic_market::{SynteticMarket, TvlScaledCaps},
+    },
     OpenPositionParams, SMParams, GLOBAL_SEED, MARKET_SEED, MARKET_VAULT, POSITION_SEED,
 };
 
@@ -87,7 +90,11 @@ fn pool_total_assets(svm: &LiteSVM, pool: &Pubkey) -> u64 {
         .total_assets
 }
 
-fn send_ix(svm: &mut LiteSVM, ix: Instruction, signers: &[&Keypair]) -> litesvm::types::TransactionResult {
+fn send_ix(
+    svm: &mut LiteSVM,
+    ix: Instruction,
+    signers: &[&Keypair],
+) -> litesvm::types::TransactionResult {
     let blockhash = svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&signers[0].pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), signers).unwrap();
@@ -109,11 +116,19 @@ fn market_vault_pda(program_id: &Pubkey, market: &Pubkey) -> Pubkey {
 }
 
 fn position_pda(program_id: &Pubkey, trader: &Pubkey, market: &Pubkey) -> Pubkey {
-    Pubkey::find_program_address(&[POSITION_SEED, trader.as_ref(), market.as_ref()], program_id).0
+    Pubkey::find_program_address(
+        &[POSITION_SEED, trader.as_ref(), market.as_ref()],
+        program_id,
+    )
+    .0
 }
 
 fn lp_pool_pda(lp_program_id: &Pubkey) -> Pubkey {
-    Pubkey::find_program_address(&[liquidity_pool::constants::LIQUIDITY_POOL_SEED], lp_program_id).0
+    Pubkey::find_program_address(
+        &[liquidity_pool::constants::LIQUIDITY_POOL_SEED],
+        lp_program_id,
+    )
+    .0
 }
 
 fn lp_usdc_vault_pda(lp_program_id: &Pubkey) -> Pubkey {
@@ -135,9 +150,17 @@ fn make_initialize_global_ix(
 ) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
-        &perp::instruction::InitializeGlobal { fee_receiver, max_markets }.data(),
-        perp::accounts::InitializeGlobal { payer, global_config, system_program: system_program::ID }
-            .to_account_metas(None),
+        &perp::instruction::InitializeGlobal {
+            fee_receiver,
+            max_markets,
+        }
+        .data(),
+        perp::accounts::InitializeGlobal {
+            payer,
+            global_config,
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
     )
 }
 
@@ -154,7 +177,11 @@ fn make_initialize_market_ix(
 ) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
-        &perp::instruction::InitializeMarket { symbol: sym, config }.data(),
+        &perp::instruction::InitializeMarket {
+            symbol: sym,
+            config,
+        }
+        .data(),
         perp::accounts::InitializeMarket {
             payer,
             global_config,
@@ -312,7 +339,9 @@ fn make_close_position_ix(
 /// 30s freshness check always passes.
 fn fabricate_price_update(svm: &mut LiteSVM, price: i64) -> Pubkey {
     let feed_id = get_feed_id_from_hex(FEED_ID_HEX).unwrap();
-    let publish_time = svm.get_sysvar::<anchor_lang::solana_program::clock::Clock>().unix_timestamp;
+    let publish_time = svm
+        .get_sysvar::<anchor_lang::solana_program::clock::Clock>()
+        .unix_timestamp;
 
     let price_update = PriceUpdateV2 {
         write_authority: Pubkey::default(),
@@ -373,12 +402,14 @@ fn setup() -> Env {
     let program_id = perp::id();
     let lp_program_id = liquidity_pool::id();
     svm.add_program(program_id, perp_bytes()).unwrap();
-    svm.add_program(lp_program_id, liquidity_pool_bytes()).unwrap();
+    svm.add_program(lp_program_id, liquidity_pool_bytes())
+        .unwrap();
 
     let payer = Keypair::new();
     svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
     let trader = Keypair::new();
-    svm.airdrop(&trader.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+    svm.airdrop(&trader.pubkey(), 10 * LAMPORTS_PER_SOL)
+        .unwrap();
 
     let usdc_mint = CreateMint::new(&mut svm, &payer)
         .authority(&payer.pubkey())
@@ -437,9 +468,15 @@ fn setup() -> Env {
         .owner(&trader.pubkey())
         .send()
         .unwrap();
-    MintTo::new(&mut svm, &payer, &usdc_mint, &trader_usdc_ata, 10_000 * 1_000_000)
-        .send()
-        .unwrap();
+    MintTo::new(
+        &mut svm,
+        &payer,
+        &usdc_mint,
+        &trader_usdc_ata,
+        10_000 * 1_000_000,
+    )
+    .send()
+    .unwrap();
 
     let fee_receiver_ata = CreateAssociatedTokenAccount::new(&mut svm, &payer, &usdc_mint)
         .owner(&fee_receiver)
@@ -468,17 +505,28 @@ fn setup() -> Env {
 /// close_position test can exercise the `debit` (pool pays trader) path.
 fn fund_pool(env: &mut Env, amount: u64) {
     let provider = Keypair::new();
-    env.svm.airdrop(&provider.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+    env.svm
+        .airdrop(&provider.pubkey(), 10 * LAMPORTS_PER_SOL)
+        .unwrap();
 
     let provider_ata = CreateAssociatedTokenAccount::new(&mut env.svm, &env.payer, &env.usdc_mint)
         .owner(&provider.pubkey())
         .send()
         .unwrap();
-    MintTo::new(&mut env.svm, &env.payer, &env.usdc_mint, &provider_ata, amount)
-        .send()
-        .unwrap();
+    MintTo::new(
+        &mut env.svm,
+        &env.payer,
+        &env.usdc_mint,
+        &provider_ata,
+        amount,
+    )
+    .send()
+    .unwrap();
 
-    let provider_lp_ata = anchor_spl::associated_token::get_associated_token_address(&provider.pubkey(), &env.lp_mint);
+    let provider_lp_ata = anchor_spl::associated_token::get_associated_token_address(
+        &provider.pubkey(),
+        &env.lp_mint,
+    );
 
     let deposit_ix = make_deposit_ix(
         env.lp_program_id,
@@ -530,13 +578,17 @@ fn test_close_position_breakeven() {
     let mut env = setup();
     let price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
 
-    let position = open(&mut env, price_update, OpenPositionParams {
-        leverage: 4,
-        margin: 100,
-        take_profit: 0,
-        stop_loss: 0,
-        position_type: PositionType::Long,
-    });
+    let position = open(
+        &mut env,
+        price_update,
+        OpenPositionParams {
+            leverage: 4,
+            margin: 100,
+            take_profit: 0,
+            stop_loss: 0,
+            position_type: PositionType::Long,
+        },
+    );
 
     let trader_before = token_balance(&env.svm, &env.trader_usdc_ata);
     let vault_before = token_balance(&env.svm, &env.market_vault);
@@ -563,10 +615,22 @@ fn test_close_position_breakeven() {
 
     // Trader gets their full collateral back (100), vault drains by exactly that,
     // and the pool/fee receiver are untouched since fee floored to 0.
-    assert_eq!(token_balance(&env.svm, &env.trader_usdc_ata) - trader_before, 100);
-    assert_eq!(vault_before - token_balance(&env.svm, &env.market_vault), 100);
-    assert_eq!(token_balance(&env.svm, &env.lp_pool_usdc_vault), lp_vault_before);
-    assert_eq!(pool_total_assets(&env.svm, &env.lp_pool), pool_assets_before);
+    assert_eq!(
+        token_balance(&env.svm, &env.trader_usdc_ata) - trader_before,
+        100
+    );
+    assert_eq!(
+        vault_before - token_balance(&env.svm, &env.market_vault),
+        100
+    );
+    assert_eq!(
+        token_balance(&env.svm, &env.lp_pool_usdc_vault),
+        lp_vault_before
+    );
+    assert_eq!(
+        pool_total_assets(&env.svm, &env.lp_pool),
+        pool_assets_before
+    );
 
     let market_data = SynteticMarket::try_deserialize(
         &mut env.svm.get_account(&env.market).unwrap().data.as_slice(),
@@ -574,7 +638,11 @@ fn test_close_position_breakeven() {
     .unwrap();
     assert_eq!(market_data.oi_long, 0);
 
-    let closed = env.svm.get_account(&position).map(|a| a.lamports).unwrap_or(0);
+    let closed = env
+        .svm
+        .get_account(&position)
+        .map(|a| a.lamports)
+        .unwrap_or(0);
     assert_eq!(closed, 0, "position account should be closed / drained");
 }
 
@@ -599,13 +667,17 @@ fn test_close_position_full_loss_credits_pool() {
 
     // margin=1_000_000, leverage=10 -> open fee 20_000 (base+skew), collateral 980_000,
     // notional 9_800_000. Matches test_open_position_distributes_fees's math.
-    let position = open(&mut env, open_price_update, OpenPositionParams {
-        leverage: 10,
-        margin: 1_000_000,
-        take_profit: 0,
-        stop_loss: 0,
-        position_type: PositionType::Long,
-    });
+    let position = open(
+        &mut env,
+        open_price_update,
+        OpenPositionParams {
+            leverage: 10,
+            margin: 1_000_000,
+            take_profit: 0,
+            stop_loss: 0,
+            position_type: PositionType::Long,
+        },
+    );
 
     // close_fee = 10bps of notional 9_800_000 = 9_800 -> protocol 1_470 / lp 8_330.
     // collateral_after_fee = 980_000 - 9_800 = 970_200.
@@ -645,7 +717,10 @@ fn test_close_position_full_loss_credits_pool() {
     assert_eq!(token_balance(&env.svm, &env.trader_usdc_ata), trader_before);
     // Vault drains by exactly the position's remaining collateral (980_000 total:
     // fee split + full loss credit), leaving no leftover or shortfall.
-    assert_eq!(vault_before - token_balance(&env.svm, &env.market_vault), 980_000);
+    assert_eq!(
+        vault_before - token_balance(&env.svm, &env.market_vault),
+        980_000
+    );
     assert_eq!(
         token_balance(&env.svm, &env.fee_receiver_ata) - fee_receiver_before,
         expected_protocol_fee
@@ -683,13 +758,17 @@ fn test_close_position_profit_funded_by_pool() {
     fund_pool(&mut env, 5_000_000);
 
     let open_price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
-    let position = open(&mut env, open_price_update, OpenPositionParams {
-        leverage: 10,
-        margin: 1_000_000,
-        take_profit: 0,
-        stop_loss: 0,
-        position_type: PositionType::Long,
-    });
+    let position = open(
+        &mut env,
+        open_price_update,
+        OpenPositionParams {
+            leverage: 10,
+            margin: 1_000_000,
+            take_profit: 0,
+            stop_loss: 0,
+            position_type: PositionType::Long,
+        },
+    );
 
     // close_fee = 9_800 -> protocol 1_470 / lp 8_330. collateral_after_fee = 970_200.
     // +10% move: pnl = +980_000. net = 970_200 + 980_000 = 1_950_200, which exceeds

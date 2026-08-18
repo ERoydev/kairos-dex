@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 
-use crate::{alliases::MicroUsdc, events::FundingUpdated, syntetic_market::SynteticMarket, PerpError};
+use crate::{
+    alliases::MicroUsdc, events::FundingUpdated, syntetic_market::SynteticMarket, PerpError,
+};
 
 pub fn _update_funding(ctx: Context<UpdateFunding>) -> Result<()> {
     let market = &mut ctx.accounts.market;
