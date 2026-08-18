@@ -1,86 +1,23 @@
-use anchor_lang::{
-    prelude::Pubkey,
-    solana_program::{instruction::Instruction, system_program},
-    AccountDeserialize, InstructionData, ToAccountMetas,
-};
+use anchor_lang::{prelude::Pubkey, AccountDeserialize};
 use litesvm::LiteSVM;
 use solana_keypair::Keypair;
-use solana_message::{Message, VersionedMessage};
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use solana_signer::Signer;
-use solana_transaction::versioned::VersionedTransaction;
 
-use perp::{state::global::GlobalConfig, GLOBAL_SEED};
+use perp::state::global::GlobalConfig;
 
-fn program_bytes() -> &'static [u8] {
-    include_bytes!(concat!(env!("CARGO_TARGET_TMPDIR"), "/../deploy/perp.so"))
-}
-
-fn global_config_pda(program_id: &Pubkey) -> Pubkey {
-    Pubkey::find_program_address(&[GLOBAL_SEED], program_id).0
-}
-
-fn make_initialize_global_ix(
-    program_id: Pubkey,
-    payer: Pubkey,
-    global_config: Pubkey,
-    fee_receiver: Pubkey,
-    max_markets: u16,
-) -> Instruction {
-    Instruction::new_with_bytes(
-        program_id,
-        &perp::instruction::InitializeGlobal {
-            fee_receiver,
-            max_markets,
-        }
-        .data(),
-        perp::accounts::InitializeGlobal {
-            payer,
-            global_config,
-            system_program: system_program::ID,
-        }
-        .to_account_metas(None),
-    )
-}
-
-fn make_update_global_ix(
-    program_id: Pubkey,
-    authority: Pubkey,
-    global_config: Pubkey,
-    params: perp::instruction::UpdateGlobal,
-) -> Instruction {
-    Instruction::new_with_bytes(
-        program_id,
-        &params.data(),
-        perp::accounts::UpdateGlobal {
-            authority,
-            global_config,
-        }
-        .to_account_metas(None),
-    )
-}
+mod common;
+use common::*;
 
 fn setup() -> (LiteSVM, Keypair, Pubkey) {
     let mut svm = LiteSVM::new();
     let program_id = perp::id();
-    svm.add_program(program_id, program_bytes()).unwrap();
+    svm.add_program(program_id, perp_bytes()).unwrap();
 
     let payer = Keypair::new();
     svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
 
     (svm, payer, program_id)
-}
-
-fn send_ix(
-    svm: &mut LiteSVM,
-    ix: Instruction,
-    signers: &[&Keypair],
-) -> litesvm::types::TransactionResult {
-    let blockhash = svm.latest_blockhash();
-    let payer_pubkey = signers[0].pubkey();
-    let msg = Message::new_with_blockhash(&[ix], Some(&payer_pubkey), &blockhash);
-    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), signers).unwrap();
-    svm.send_transaction(tx)
 }
 
 #[test]
