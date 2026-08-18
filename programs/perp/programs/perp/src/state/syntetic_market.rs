@@ -15,7 +15,7 @@ It is not a service, it's just a dev script something that is admin-triggered ev
 */
 
 #[account]
-#[derive(InitSpace)]
+#[derive(InitSpace, Debug)]
 pub struct SynteticMarket {
     pub version: u8,
     pub bump: u8,
@@ -65,7 +65,7 @@ impl SynteticMarket {
 }
 
 /// Layer 1 of Risk management
-#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct RiskManagementParameters {
     pub max_leverage: u16,
     pub maintenance_margin_bps: u16, // MMR, liquidation threshold
@@ -73,7 +73,7 @@ pub struct RiskManagementParameters {
     pub caps: TvlScaledCaps,
 }
 
-#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize, Debug)]
 /// Those get updated, when TVL in the pool grows or shrinks
 pub struct TvlScaledCaps {
     pub max_position_notional: MicroUsdc, // single position size cap -> 100,000 for example means, a Position cannot exceed this in USDC
@@ -83,7 +83,7 @@ pub struct TvlScaledCaps {
     pub max_skew: MicroUsdc, // net directional cap, 20% of Total Value Locked in LP Pool
 }
 
-#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct FeeSchedule {
     /// Flat fee applied to every trade, in basis points (1 bps = 0.01%)
     pub base_fee_bps: u16,
@@ -101,14 +101,14 @@ impl Default for FeeSchedule {
     }
 }
 
-#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize, Default)]
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct FundingFees {
     // The bot every hour calls update_funding to update cumulative_index
     pub cumulative_funding_index_bps: i64,
     pub last_funding_time: i64,
 }
 
-#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct FundingConfig {
     pub sensitivity_bps: u16,
     pub max_rate_bps: u16,

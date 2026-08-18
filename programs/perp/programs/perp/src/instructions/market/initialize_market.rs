@@ -5,6 +5,7 @@ use crate::{
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use liquidity_pool::{Pool, LIQUIDITY_POOL_SEED};
 
 // Admin instruction
 pub fn _initialize_market(
@@ -15,8 +16,7 @@ pub fn _initialize_market(
     require!(config.max_leverage > 0, PerpError::InvalidConfig);
     require!(config.mmr_bps < 10_000, PerpError::InvalidConfig);
 
-    // TODO: Fix later
-    let mock_lp_tvl = 50_000;
+    let lp_tvl = ctx.accounts.lp_pool.total_assets;
 
     let market = &mut ctx.accounts.market;
     market.version = MARKET_VERSION;
@@ -38,7 +38,7 @@ pub fn _initialize_market(
         max_leverage: config.max_leverage,
         maintenance_margin_bps: config.mmr_bps,
         fee_schedule: FeeSchedule::default(),
-        caps: compute_caps(mock_lp_tvl),
+        caps: compute_caps(lp_tvl),
     };
 
     market.funding_config = FundingConfig::default();
@@ -102,6 +102,13 @@ pub struct InitializeMarket<'info> {
     )]
     pub insurance_fund_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
+    /// LP pool TVL is used to seed this market's risk caps
+    #[account(
+        seeds = [LIQUIDITY_POOL_SEED],
+        bump = lp_pool.bump,
+        seeds::program = liquidity_pool::ID,
+    )]
+    pub lp_pool: Box<Account<'info, Pool>>,
 
     /// CHECK: It Is Checked
     #[account(constraint=oracle.key() != Pubkey::default())]

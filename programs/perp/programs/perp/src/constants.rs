@@ -28,6 +28,7 @@ pub const PYTH_PRICE_EXPONENT: i32 = -8;
 
 // --- Numerical constants
 
+// TODO: Maybe is good idea to specify those constants to a specific Market instead of Global constants that are used accross all markets
 #[constant]
 pub const SENSITIVITY_BPS: u16 = 75; // 0.75 multiplier, it is replacement for premium
 
