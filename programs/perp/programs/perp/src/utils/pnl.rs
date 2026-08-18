@@ -42,7 +42,7 @@ pub fn apply_funding(
         PositionType::Short => collateral as i64 + accrued,
     };
 
-    adjusted.max(0) as u64
+    adjusted.max(0) as u64 // The collateral value without funding 
 }
 
 /// Called from close_position / liquidate after calculate_pnl().
