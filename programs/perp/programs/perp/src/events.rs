@@ -45,5 +45,15 @@ pub struct PositionOpened {
     pub position: Pubkey,
     pub trader: Pubkey,
     pub oracle_price: MicroUsdc,
-    pub entry_funding_index: i64,
+    pub entry_funding_index_bps: i64,
+}
+
+#[event]
+pub struct PositionClosed {
+    pub market: Pubkey,
+    pub position: Pubkey,
+    pub trader: Pubkey,
+    pub exit_price: MicroUsdc,
+    pub pnl: i64,
+    pub payout: MicroUsdc,
 }

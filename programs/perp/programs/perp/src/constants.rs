@@ -17,6 +17,15 @@ pub const PROTOCOL_FEES_BPS: u16 = 1500;
 #[constant]
 pub const LP_FEES_BPS: u16 = 8500;
 
+#[constant]
+pub const PYTH_MAX_PRICE_AGE_SECONDS: u64 = 30;
+
+// Pyth prices are `price * 10^exponent`. Every feed this program reads is expected
+// to publish at exponent -8; convert_price_to_micro_usdc relies on this to scale
+// down to MicroUsdc's 6 decimals.
+#[constant]
+pub const PYTH_PRICE_EXPONENT: i32 = -8;
+
 // --- Numerical constants
 
 #[constant]

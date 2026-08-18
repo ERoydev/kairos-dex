@@ -22,15 +22,38 @@ pub fn calculate_pnl(
     pnl as i64
 }
 
+/// Applies funding accrued since the position was opened to its collateral.
+/// `delta` is how much the market's cumulative funding index moved since entry:
+/// a positive delta means longs were crowded, so longs pay and shorts receive.
+/// Clamped at 0 — funding can't push collateral negative.
+pub fn apply_funding(
+    side: PositionType,
+    collateral: MicroUsdc,
+    notional: MicroUsdc,
+    entry_funding_index: i64,
+    cumulative_funding_index: i64,
+) -> MicroUsdc {
+    let delta = cumulative_funding_index - entry_funding_index;
+    // actual funding payment in MicroUsdc that this position owes or is owed
+    let accrued = (notional as i128 * delta as i128 / 10_000) as i64;
+
+    let adjusted = match side {
+        PositionType::Long => collateral as i64 - accrued,
+        PositionType::Short => collateral as i64 + accrued,
+    };
+
+    adjusted.max(0) as u64
+}
+
 /// Called from close_position / liquidate after calculate_pnl().
 /// Returns (amount_to_pay_trader, credit_amount_to_pool, debit_amount_from_pool)
 pub fn settle(margin: u64, pnl: i64, fee: u64) -> (u64, u64, u64) {
-    let net = margin as i64 + pnl - fee as i64;
+    let net = margin as i64 + pnl - fee as i64; // what trader should walk away with
 
     if net > 0 {
         // trader is owed net back. If net > margin, pool must pay the difference.
         let payout = net as u64;
-        if payout > margin {
+        if payout > margin { 
             let debit_from_pool = payout - margin;
             (payout, 0, debit_from_pool)
         } else {

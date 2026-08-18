@@ -1,11 +1,15 @@
 use crate::{
-    error::PerpError, events::MarketInitialized, state::global::GlobalConfig, syntetic_market::{
+    error::PerpError,
+    events::MarketInitialized,
+    state::global::GlobalConfig,
+    syntetic_market::{
         FeeSchedule, FundingConfig, FundingFees, RiskManagementParameters, SynteticMarket,
-    }, utils::caps::compute_caps, GLOBAL_SEED, MARKET_SEED, MARKET_VAULT, MARKET_VERSION
+    },
+    utils::caps::compute_caps,
+    GLOBAL_SEED, MARKET_SEED, MARKET_VAULT, MARKET_VERSION,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
-
 
 // Admin instruction
 pub fn _initialize_market(

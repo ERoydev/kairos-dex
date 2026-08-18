@@ -4,7 +4,6 @@ use crate::{error::PerpError, events::MarketPaused, syntetic_market::SynteticMar
 
 // Admin instruction
 pub fn _market_pause(ctx: Context<MarketPause>, is_active: bool) -> Result<()> {
-
     require!(
         ctx.accounts.market.is_active != is_active,
         PerpError::MarketAlreadyInState
