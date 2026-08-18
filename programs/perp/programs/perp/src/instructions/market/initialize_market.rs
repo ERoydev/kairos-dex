@@ -1,12 +1,7 @@
 use crate::{
-    error::PerpError,
-    events::MarketInitialized,
-    state::global::GlobalConfig,
-    syntetic_market::{
+    error::PerpError, events::MarketInitialized, state::global::GlobalConfig, syntetic_market::{
         FeeSchedule, FundingConfig, FundingFees, RiskManagementParameters, SynteticMarket,
-    },
-    utils::caps::compute_caps,
-    GLOBAL_SEED, MARKET_SEED, MARKET_VAULT, MARKET_VERSION,
+    }, utils::caps::compute_caps, GLOBAL_SEED, INSURANCE_FUND_VAULT, MARKET_SEED, MARKET_VAULT, MARKET_VERSION
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
@@ -95,6 +90,18 @@ pub struct InitializeMarket<'info> {
         token::authority = vault
     )]
     pub vault: InterfaceAccount<'info, TokenAccount>,
+
+    /// Insurance fund used for liquidation
+    #[account(
+        init,
+        payer = payer,
+        seeds = [INSURANCE_FUND_VAULT, market.key().as_ref()],
+        bump,
+        token::mint = usdc_mint,
+        token::authority = insurance_fund_vault
+    )]
+    pub insurance_fund_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+
 
     /// CHECK: It Is Checked
     #[account(constraint=oracle.key() != Pubkey::default())]

@@ -44,6 +44,9 @@ pub const BASE_FEE_BPS: u16 = 10; // 0.10%, charged on both open and close
 #[constant]
 pub const SKEW_FEE_MAX_BPS: u16 = 20; // up to 0.20% extra at max skew
 
+#[constant]
+pub const BAD_DEBT_KEEPER_REWARD_BPS: u16 = 10; // 0.10% of notional, paid from the insurance fund when there's no equity left to split as a penalty
+
 // --- Seeds
 
 #[constant]
@@ -57,3 +60,6 @@ pub const GLOBAL_SEED: &[u8] = b"global";
 
 #[constant]
 pub const MARKET_VAULT: &[u8] = b"market_vault";
+
+#[constant]
+pub const INSURANCE_FUND_VAULT: &[u8] = b"insurance_fund_vault";

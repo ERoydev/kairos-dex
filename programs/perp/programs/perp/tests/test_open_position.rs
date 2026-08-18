@@ -44,7 +44,7 @@ use perp::{
         position::PositionType,
         syntetic_market::{SynteticMarket, TvlScaledCaps},
     },
-    OpenPositionParams, SMParams, GLOBAL_SEED, MARKET_SEED, MARKET_VAULT, POSITION_SEED,
+    OpenPositionParams, SMParams, GLOBAL_SEED, INSURANCE_FUND_VAULT, MARKET_SEED, MARKET_VAULT, POSITION_SEED,
 };
 
 const USDC_DECIMALS: u8 = 6;
@@ -116,6 +116,10 @@ fn market_vault_pda(program_id: &Pubkey, market: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[MARKET_VAULT, market.as_ref()], program_id).0
 }
 
+fn insurance_fund_vault_pda(program_id: &Pubkey, market: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[INSURANCE_FUND_VAULT, market.as_ref()], program_id).0
+}
+
 fn position_pda(program_id: &Pubkey, trader: &Pubkey, market: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(
         &[POSITION_SEED, trader.as_ref(), market.as_ref()],
@@ -171,6 +175,7 @@ fn make_initialize_market_ix(
     global_config: Pubkey,
     market: Pubkey,
     vault: Pubkey,
+    insurance_fund_vault: Pubkey,
     oracle: Pubkey,
     usdc_mint: Pubkey,
     sym: [u8; 16],
@@ -188,6 +193,7 @@ fn make_initialize_market_ix(
             global_config,
             market,
             vault,
+            insurance_fund_vault,
             oracle,
             usdc_mint,
             token_program: anchor_spl::token::ID,
@@ -359,6 +365,7 @@ fn setup() -> Env {
     let sym = symbol("BTC-PERP");
     let market = market_pda(&program_id, &sym);
     let market_vault = market_vault_pda(&program_id, &market);
+    let insurance_fund_vault = insurance_fund_vault_pda(&program_id, &market);
     let oracle = Keypair::new().pubkey();
     let init_market_ix = make_initialize_market_ix(
         program_id,
@@ -366,6 +373,7 @@ fn setup() -> Env {
         global_config,
         market,
         market_vault,
+        insurance_fund_vault,
         oracle,
         usdc_mint,
         sym,

@@ -34,4 +34,6 @@ pub enum PerpError {
     LeverageOutOfBounds,
     #[msg("Cannot calculate Open Fee on Close Position")]
     CannotCalculateOpenFeeOnClosePosition,
+    #[msg("Position is above the maintenance margin requirement and cannot be liquidated")]
+    PositionNotLiquidatable,
 }

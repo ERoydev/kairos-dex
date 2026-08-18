@@ -70,8 +70,7 @@ pub fn _close_position(ctx: Context<ClosePosition>) -> Result<()> {
     let market_vault_bump = ctx.bumps.market_vault;
 
     // Peel the close fee out of the vault first, same 15/85 split as on open.
-    ctx.accounts
-        .transfer_protocol_fee(protocol_fees, market_vault_bump)?;
+    ctx.accounts.transfer_protocol_fee(protocol_fees, market_vault_bump)?;
     ctx.accounts.credit_lp_pool(lp_fees, market_vault_bump)?;
 
     // Then settle the trade itself between trader, vault and pool.
@@ -129,7 +128,7 @@ pub struct ClosePosition<'info> {
     // trader or market simply fails PDA derivation — no extra ownership check needed.
     #[account(
         mut,
-        close = trader,
+        close = trader, // ANCHOR: deletes the account, all lamports `rent` are transferred to trader
         seeds = [POSITION_SEED, trader.key().as_ref(), market.key().as_ref()],
         bump,
     )]
