@@ -21,6 +21,7 @@ declare_id!("FWmruxC6TfBGZyXbQtzNjjJVrYMzRWLsTr6iscs9bkyK");
 pub mod perp {
     use crate::close_position::_close_position;
     use crate::initialize_market::_initialize_market;
+    use crate::liquidate::_liquidate;
 
     use super::*;
 
@@ -50,6 +51,10 @@ pub mod perp {
 
     pub fn close_position(ctx: Context<ClosePosition>) -> Result<()> {
         _close_position(ctx)
+    }
+
+    pub fn liquidate(ctx: Context<Liquidate>) -> Result<()> {
+        _liquidate(ctx)
     }
 
     pub fn market_pause(ctx: Context<MarketPause>, is_active: bool) -> Result<()> {

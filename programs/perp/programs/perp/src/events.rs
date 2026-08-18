@@ -57,3 +57,16 @@ pub struct PositionClosed {
     pub pnl: i64,
     pub payout: MicroUsdc,
 }
+
+#[event]
+pub struct PositionLiquidated {
+    pub market: Pubkey,
+    pub position: Pubkey,
+    pub trader: Pubkey,
+    pub liquidator: Pubkey,
+    pub exit_price: MicroUsdc,
+    pub pnl: i64,
+    pub equity: i64,
+    pub liquidator_reward: MicroUsdc,
+    pub bad_debt: bool,
+}
