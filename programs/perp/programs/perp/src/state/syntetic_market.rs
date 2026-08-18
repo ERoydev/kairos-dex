@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    BASE_FEE_BPS, INTERVAL_SECONDS, LP_FEES_BPS, MAX_RATE_BPS, PROTOCOL_FEES_BPS, PerpError, SENSITIVITY_BPS, SKEW_FEE_MAX_BPS, alliases::MicroUsdc,
+    alliases::MicroUsdc, PerpError, BASE_FEE_BPS, INTERVAL_SECONDS, MAX_RATE_BPS, SENSITIVITY_BPS, SKEW_FEE_MAX_BPS,
 };
 
 /*
@@ -40,37 +40,27 @@ pub struct SynteticMarket {
 }
 
 impl SynteticMarket {
-
     /// Calcualte the OI interests and return the computed values (new_oi, oi_cap)
-    pub fn calc_open_interest(is_long: bool, position_size: MicroUsdc, oi_long: MicroUsdc, oi_short: MicroUsdc, max_oi_long: MicroUsdc, max_oi_short: MicroUsdc) -> Result<(MicroUsdc, MicroUsdc)> {
+    pub fn calc_open_interest(
+        is_long: bool,
+        position_size: MicroUsdc,
+        oi_long: MicroUsdc,
+        oi_short: MicroUsdc,
+        max_oi_long: MicroUsdc,
+        max_oi_short: MicroUsdc,
+    ) -> Result<(MicroUsdc, MicroUsdc)> {
         let new_oi = if is_long {
-            oi_long.checked_add(position_size).ok_or(PerpError::MathOverflow)?
+            oi_long
+                .checked_add(position_size)
+                .ok_or(PerpError::MathOverflow)?
         } else {
-            oi_short.checked_add(position_size).ok_or(PerpError::MathOverflow)?
+            oi_short
+                .checked_add(position_size)
+                .ok_or(PerpError::MathOverflow)?
         };
-        let oi_cap = if is_long {
-            max_oi_long
-        } else {
-            max_oi_short
-        };
+        let oi_cap = if is_long { max_oi_long } else { max_oi_short };
 
         Ok((new_oi, oi_cap))
-    }
-
-    /// protocol_fees floors down integer divison; lp_fees takes the remained via subtraction
-    pub fn calc_distributed_fees(total_fees: MicroUsdc) -> Result<(MicroUsdc, MicroUsdc)> {
-
-        let protocol_fees = (total_fees as u128)
-            .checked_mul(PROTOCOL_FEES_BPS as u128)
-            .ok_or(PerpError::MathOverflow)?
-            .checked_div(10_000)
-            .ok_or(PerpError::MathOverflow)? as u64;
-
-        let lp_fees = total_fees
-            .checked_sub(protocol_fees)
-            .ok_or(PerpError::MathOverflow)?;
-
-    Ok((protocol_fees, lp_fees))
     }
 }
 
@@ -86,11 +76,11 @@ pub struct RiskManagementParameters {
 #[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
 /// Those get updated, when TVL in the pool grows or shrinks
 pub struct TvlScaledCaps {
-    pub max_position_notional: MicroUsdc,   // single position size cap -> 100,000 for example means, a Position cannot exceed this in USDC
-    pub max_user_notional: MicroUsdc,       // cap on the sum of all one user's positions in that market.
-    pub max_oi_long: MicroUsdc,             // gross open interest caps per side
+    pub max_position_notional: MicroUsdc, // single position size cap -> 100,000 for example means, a Position cannot exceed this in USDC
+    pub max_user_notional: MicroUsdc, // cap on the sum of all one user's positions in that market.
+    pub max_oi_long: MicroUsdc,       // gross open interest caps per side
     pub max_oi_short: MicroUsdc,
-    pub max_skew: MicroUsdc,                // net directional cap, 20% of Total Value Locked in LP Pool
+    pub max_skew: MicroUsdc, // net directional cap, 20% of Total Value Locked in LP Pool
 }
 
 #[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize)]
