@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{events::GlobalInitialized, state::global::GlobalConfig, PerpError, GLOBAL_SEED};
 
+/// Admin
 pub fn _initialize_global(
     ctx: Context<InitializeGlobal>,
     fee_receiver: Pubkey,
@@ -18,6 +19,7 @@ pub fn _initialize_global(
     config.fee_receiver = fee_receiver;
     config.is_paused = false;
     config.max_markets = max_markets;
+    config.markets_count = 0;
     config.bump = ctx.bumps.global_config;
 
     emit!(GlobalInitialized {

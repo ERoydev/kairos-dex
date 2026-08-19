@@ -4,6 +4,7 @@ use crate::{
     alliases::MicroUsdc, events::FundingUpdated, syntetic_market::SynteticMarket, PerpError,
 };
 
+/// Update the comulative_funding_index, invoked from `perp-keeper` bot. (Permissionless)
 pub fn _update_funding(ctx: Context<UpdateFunding>) -> Result<()> {
     let market = &mut ctx.accounts.market;
 

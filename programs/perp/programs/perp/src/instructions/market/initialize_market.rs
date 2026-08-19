@@ -22,6 +22,7 @@ pub fn _initialize_market(
     require!(config.mmr_bps < 10_000, PerpError::InvalidConfig);
 
     let lp_tvl = ctx.accounts.lp_pool.total_assets;
+    let global_config = &mut ctx.accounts.global_config;
 
     let market = &mut ctx.accounts.market;
     market.version = MARKET_VERSION;
@@ -49,6 +50,7 @@ pub fn _initialize_market(
     market.funding_config = FundingConfig::default();
 
     market.is_active = true;
+    global_config.markets_count.checked_add(1).ok_or(PerpError::MathOverflow)?;
 
     emit!(MarketInitialized {
         market: ctx.accounts.market.key(),
@@ -71,6 +73,7 @@ pub struct InitializeMarket<'info> {
 
     /// Sets all the GlobalConfig for that market
     #[account(
+        mut,
         seeds = [GLOBAL_SEED],
         bump = global_config.bump,
     )]
