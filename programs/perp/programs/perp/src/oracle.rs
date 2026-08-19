@@ -67,7 +67,7 @@ impl<'a, 'info> OracleAdapter<'a, 'info> {
         );
 
         // Convert to MicroUSDC
-        Ok(normalize_price_to_microusdc(&price.price, &price.exponent)?)
+        normalize_price_to_microusdc(&price.price, &price.exponent)
     }
 }
 
