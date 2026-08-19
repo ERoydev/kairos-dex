@@ -21,6 +21,7 @@ use liquidity_pool::Pool;
 
 // Closing is allowed even while the market is paused (`is_active = false`) —
 // pause only blocks new positions, it shouldn't trap traders already in one.
+// Closing position handles `withdraw` functionality, so Win or Loss are handled here.
 pub fn _close_position(ctx: Context<ClosePosition>) -> Result<()> {
     let market = &ctx.accounts.market;
     let position = &ctx.accounts.position;
