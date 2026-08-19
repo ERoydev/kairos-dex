@@ -484,10 +484,11 @@ fn test_liquidate_allows_any_keeper() {
     env.svm
         .airdrop(&random_keeper.pubkey(), 10 * LAMPORTS_PER_SOL)
         .unwrap();
-    let keeper_usdc_ata = CreateAssociatedTokenAccount::new(&mut env.svm, &env.payer, &env.usdc_mint)
-        .owner(&random_keeper.pubkey())
-        .send()
-        .unwrap();
+    let keeper_usdc_ata =
+        CreateAssociatedTokenAccount::new(&mut env.svm, &env.payer, &env.usdc_mint)
+            .owner(&random_keeper.pubkey())
+            .send()
+            .unwrap();
 
     let liquidate_ix = make_liquidate_ix(
         env.program_id,

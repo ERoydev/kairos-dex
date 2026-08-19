@@ -129,10 +129,19 @@ fn test_initialize_market_ok() {
     assert_eq!(data.funding_fees.cumulative_funding_index_bps, 0);
     assert_eq!(data.funding_fees.last_funding_time, 0);
 
-    assert_eq!(data.risk_management.max_leverage, default_config().max_leverage);
-    assert_eq!(data.risk_management.maintenance_margin_bps, default_config().mmr_bps);
+    assert_eq!(
+        data.risk_management.max_leverage,
+        default_config().max_leverage
+    );
+    assert_eq!(
+        data.risk_management.maintenance_margin_bps,
+        default_config().mmr_bps
+    );
     assert_eq!(data.risk_management.fee_schedule.base_fee_bps, BASE_FEE_BPS);
-    assert_eq!(data.risk_management.fee_schedule.skew_fee_max_bps, SKEW_FEE_MAX_BPS);
+    assert_eq!(
+        data.risk_management.fee_schedule.skew_fee_max_bps,
+        SKEW_FEE_MAX_BPS
+    );
     // setup()'s lp_pool has no deposits, so total_assets == 0 and every TVL-scaled cap is 0.
     assert_eq!(data.risk_management.caps.max_position_notional, 0);
     assert_eq!(data.risk_management.caps.max_user_notional, 0);

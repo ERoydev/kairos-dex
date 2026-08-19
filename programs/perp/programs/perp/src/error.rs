@@ -36,4 +36,8 @@ pub enum PerpError {
     CannotCalculateOpenFeeOnClosePosition,
     #[msg("Position is above the maintenance margin requirement and cannot be liquidated")]
     PositionNotLiquidatable,
+    #[msg("OracleUncertain")]
+    OracleUncertain,
+    #[msg("Oracle Read failed")]
+    OracleGuardReadFailed,
 }

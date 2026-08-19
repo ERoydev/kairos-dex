@@ -11,8 +11,18 @@ pub struct FeeModel<'a> {
 }
 
 impl<'a> FeeModel<'a> {
-    pub fn new(notional: &'a MicroUsdc, fee_schedule: &'a FeeSchedule, projected_skew: Option<&'a MicroUsdc>, max_skew: Option<&'a MicroUsdc>) -> FeeModel<'a> {
-        FeeModel { notional, fee_schedule, projected_skew, max_skew}
+    pub fn new(
+        notional: &'a MicroUsdc,
+        fee_schedule: &'a FeeSchedule,
+        projected_skew: Option<&'a MicroUsdc>,
+        max_skew: Option<&'a MicroUsdc>,
+    ) -> FeeModel<'a> {
+        FeeModel {
+            notional,
+            fee_schedule,
+            projected_skew,
+            max_skew,
+        }
     }
 
     /// fee_bps: fee in basis points (1 bps = 0.01%). e.g. 10 = 0.10%
@@ -37,7 +47,7 @@ impl<'a> FeeModel<'a> {
 
         Ok(res as u64)
     }
-    
+
     /// Those are `Trade Fees`, they are charged on `open` and `close`. One-time
     /// Paid at open → already deducted from collateral before position exists.
     /// Paid at close → applied when user closes, doesn't affect liquidation trigger.
@@ -45,10 +55,16 @@ impl<'a> FeeModel<'a> {
         let base_fee: MicroUsdc = self.calculate_base_fee(None)?;
 
         let skew_fee: MicroUsdc = if worsens_skew {
-            let projected_skew = *self.projected_skew.ok_or(PerpError::CannotCalculateOpenFeeOnClosePosition)? as u128;
-            let max_skew = *self.max_skew.ok_or(PerpError::CannotCalculateOpenFeeOnClosePosition)? as u128;
+            let projected_skew = *self
+                .projected_skew
+                .ok_or(PerpError::CannotCalculateOpenFeeOnClosePosition)?
+                as u128;
+            let max_skew = *self
+                .max_skew
+                .ok_or(PerpError::CannotCalculateOpenFeeOnClosePosition)?
+                as u128;
             let skew_fee_max_bps = self.fee_schedule.skew_fee_max_bps as u128;
-            
+
             // fee_max_bps * project skew / max_skew
             let scaled_bps = skew_fee_max_bps
                 .checked_mul(projected_skew)
@@ -60,7 +76,9 @@ impl<'a> FeeModel<'a> {
             0
         };
 
-        Ok(base_fee.checked_add(skew_fee).ok_or(PerpError::MathOverflow)?)
+        Ok(base_fee
+            .checked_add(skew_fee)
+            .ok_or(PerpError::MathOverflow)?)
     }
 
     /// protocol_fees floors down integer divison; lp_fees takes the remained via subtraction
@@ -77,5 +95,4 @@ impl<'a> FeeModel<'a> {
 
         Ok((protocol_fees, lp_fees))
     }
-
 }
