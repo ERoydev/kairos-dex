@@ -1,6 +1,5 @@
 use crate::{alliases::MicroUsdc, position::PositionType};
 
-
 /// Computes PnL in USDC (same precision as `size`/`margin`) for a position.
 /// `size` is the notional exposure in USDC, entry/exit prices share the same decimals.
 pub fn calculate_pnl(
@@ -43,7 +42,7 @@ pub fn apply_funding(
         PositionType::Short => collateral as i64 + accrued,
     };
 
-    adjusted.max(0) as u64 // The collateral value without funding 
+    adjusted.max(0) as u64 // The collateral value without funding
 }
 
 /// Called from close_position / liquidate after calculate_pnl().
@@ -54,7 +53,7 @@ pub fn settle(margin: u64, pnl: i64, fee: u64) -> (u64, u64, u64) {
     if net > 0 {
         // trader is owed net back. If net > margin, pool must pay the difference.
         let payout = net as u64;
-        if payout > margin { 
+        if payout > margin {
             let debit_from_pool = payout - margin;
             (payout, 0, debit_from_pool)
         } else {

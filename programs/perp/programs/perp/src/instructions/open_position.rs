@@ -5,7 +5,13 @@ use anchor_spl::token_interface::{
 use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
 use crate::{
-    alliases::MicroUsdc, events::PositionOpened, global::GlobalConfig, position::{Position, PositionType}, syntetic_market::SynteticMarket, utils::{fee_model::FeeModel, skew::Skew}, OracleAdapter, PerpError, MARKET_VAULT, POSITION_SEED
+    alliases::MicroUsdc,
+    events::PositionOpened,
+    global::GlobalConfig,
+    position::{Position, PositionType},
+    syntetic_market::SynteticMarket,
+    utils::{fee_model::FeeModel, skew::Skew},
+    OracleAdapter, PerpError, MARKET_VAULT, POSITION_SEED,
 };
 
 // This imports the credit function and Credit accounts struct from liquidity-pool
@@ -29,7 +35,9 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
     let feed_id: [u8; 32] = get_feed_id_from_hex(&market.feed_id)?;
     let price_update = &mut ctx.accounts.price_update; // Price account
     let oracle_guard = OracleAdapter::new(&price_update, &feed_id);
-    let asset_price: MicroUsdc = oracle_guard.read_price_guarded(&Clock::get()?).map_err(|_| PerpError::OracleGuardReadFailed)?;
+    let asset_price: MicroUsdc = oracle_guard
+        .read_price_guarded(&Clock::get()?)
+        .map_err(|_| PerpError::OracleGuardReadFailed)?;
 
     // Position_size
     let notional_before_fee: MicroUsdc = o_params
@@ -92,7 +100,8 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
     // aggregate exposure tracked across a trader's positions in this market.
 
     // Distribute fees
-    let (protocol_fees, lp_fees): (MicroUsdc, MicroUsdc) = fee_model.calc_distributed_fees(fee_to_pay)?;
+    let (protocol_fees, lp_fees): (MicroUsdc, MicroUsdc) =
+        fee_model.calc_distributed_fees(fee_to_pay)?;
 
     // Settle funds. credit_lp_pool's CPI can only pull from an account market_vault
     // itself controls (its `source` authority must be the signing `caller`), so

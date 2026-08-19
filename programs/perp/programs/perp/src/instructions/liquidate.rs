@@ -5,7 +5,13 @@ use anchor_spl::token_interface::{
 use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
 use crate::{
-    alliases::MicroUsdc, events::PositionLiquidated, position::{Position, PositionType}, syntetic_market::SynteticMarket, utils::pnl::{apply_funding, calculate_pnl}, OracleAdapter, PerpError, BAD_DEBT_KEEPER_REWARD_BPS, INSURANCE_FUND_VAULT, MARKET_VAULT, POSITION_SEED
+    alliases::MicroUsdc,
+    events::PositionLiquidated,
+    position::{Position, PositionType},
+    syntetic_market::SynteticMarket,
+    utils::pnl::{apply_funding, calculate_pnl},
+    OracleAdapter, PerpError, BAD_DEBT_KEEPER_REWARD_BPS, INSURANCE_FUND_VAULT, MARKET_VAULT,
+    POSITION_SEED,
 };
 
 // Anyone can call this (permissionless keeper). No trade fee is charged here —
@@ -17,7 +23,9 @@ pub fn _liquidate(ctx: Context<Liquidate>) -> Result<()> {
 
     let feed_id: [u8; 32] = get_feed_id_from_hex(&market.feed_id)?;
     let oracle_guard = OracleAdapter::new(&ctx.accounts.price_update, &feed_id);
-    let exit_price: MicroUsdc = oracle_guard.read_price_guarded(&Clock::get()?).map_err(|_| PerpError::OracleGuardReadFailed)?;
+    let exit_price: MicroUsdc = oracle_guard
+        .read_price_guarded(&Clock::get()?)
+        .map_err(|_| PerpError::OracleGuardReadFailed)?;
 
     // Settle funding accrued since the position was opened
     let collateral = apply_funding(
@@ -91,7 +99,7 @@ pub fn _liquidate(ctx: Context<Liquidate>) -> Result<()> {
     let trader_key = ctx.accounts.trader.key();
     let liquidator_key = ctx.accounts.liquidator.key();
     let market = &mut ctx.accounts.market;
-    
+
     match side {
         PositionType::Long => market.oi_long -= notional,
         PositionType::Short => market.oi_short -= notional,
@@ -199,7 +207,11 @@ impl<'info> Liquidate<'info> {
 
     /// market_vault → insurance_fund_vault, signed by the market_vault PDA. The insurance
     /// fund's 50% cut of the liquidation penalty.
-    pub fn transfer_to_insurance_fund(&self, amount: MicroUsdc, market_vault_bump: u8) -> Result<()> {
+    pub fn transfer_to_insurance_fund(
+        &self,
+        amount: MicroUsdc,
+        market_vault_bump: u8,
+    ) -> Result<()> {
         let market_key = self.market.key();
         let bump = [market_vault_bump];
         let seeds: &[&[&[u8]]] = &[&Self::vault_signer_seeds(&market_key, &bump)];
@@ -219,7 +231,11 @@ impl<'info> Liquidate<'info> {
 
     /// insurance_fund_vault → liquidator_usdc_ata, signed by the insurance_fund_vault PDA.
     /// Small flat keeper reward on a bad-debt liquidation, where there's no equity left to split.
-    pub fn transfer_insurance_to_liquidator(&self, amount: MicroUsdc, insurance_fund_bump: u8) -> Result<()> {
+    pub fn transfer_insurance_to_liquidator(
+        &self,
+        amount: MicroUsdc,
+        insurance_fund_bump: u8,
+    ) -> Result<()> {
         let market_key = self.market.key();
         let bump = [insurance_fund_bump];
         let seeds: &[&[&[u8]]] = &[&Self::insurance_fund_signer_seeds(&market_key, &bump)];

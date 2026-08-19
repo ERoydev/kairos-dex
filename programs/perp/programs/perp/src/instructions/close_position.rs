@@ -5,10 +5,16 @@ use anchor_spl::token_interface::{
 use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
 use crate::{
-    alliases::MicroUsdc, events::PositionClosed, global::GlobalConfig, position::{Position, PositionType}, syntetic_market::SynteticMarket, utils::{
+    alliases::MicroUsdc,
+    events::PositionClosed,
+    global::GlobalConfig,
+    position::{Position, PositionType},
+    syntetic_market::SynteticMarket,
+    utils::{
         fee_model::FeeModel,
         pnl::{apply_funding, calculate_pnl, settle},
-    }, OracleAdapter, PerpError, MARKET_VAULT, POSITION_SEED
+    },
+    OracleAdapter, PerpError, MARKET_VAULT, POSITION_SEED,
 };
 
 use liquidity_pool::Pool;
@@ -21,7 +27,9 @@ pub fn _close_position(ctx: Context<ClosePosition>) -> Result<()> {
 
     let feed_id: [u8; 32] = get_feed_id_from_hex(&market.feed_id)?;
     let oracle_guard = OracleAdapter::new(&ctx.accounts.price_update, &feed_id);
-    let exit_price: MicroUsdc = oracle_guard.read_price_guarded(&Clock::get()?).map_err(|_| PerpError::OracleGuardReadFailed)?;
+    let exit_price: MicroUsdc = oracle_guard
+        .read_price_guarded(&Clock::get()?)
+        .map_err(|_| PerpError::OracleGuardReadFailed)?;
 
     // Settle funding accrued since the position was opened
     let collateral = apply_funding(
@@ -54,12 +62,14 @@ pub fn _close_position(ctx: Context<ClosePosition>) -> Result<()> {
 
     // (amount_to_pay_trader, credit_amount_to_pool, debit_amount_from_pool)
     let (payout, credit_to_pool, debit_from_pool) = settle(collateral_after_fee, pnl, 0);
-    let (protocol_fees, lp_fees): (MicroUsdc, MicroUsdc) = fee_model.calc_distributed_fees(close_fee)?;
+    let (protocol_fees, lp_fees): (MicroUsdc, MicroUsdc) =
+        fee_model.calc_distributed_fees(close_fee)?;
 
     let market_vault_bump = ctx.bumps.market_vault;
 
     // Peel the close fee out of the vault first, same 15/85 split as on open.
-    ctx.accounts.transfer_protocol_fee(protocol_fees, market_vault_bump)?;
+    ctx.accounts
+        .transfer_protocol_fee(protocol_fees, market_vault_bump)?;
     ctx.accounts.credit_lp_pool(lp_fees, market_vault_bump)?;
 
     // Then settle the trade itself between trader, vault and pool.

@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    alliases::MicroUsdc, PerpError, BASE_FEE_BPS, INTERVAL_SECONDS, MAX_RATE_BPS, SENSITIVITY_BPS, SKEW_FEE_MAX_BPS,
+    alliases::MicroUsdc, PerpError, BASE_FEE_BPS, INTERVAL_SECONDS, MAX_RATE_BPS, SENSITIVITY_BPS,
+    SKEW_FEE_MAX_BPS,
 };
 
 /*
