@@ -1,5 +1,6 @@
 use crate::{alliases::MicroUsdc, position::PositionType};
 
+
 /// Computes PnL in USDC (same precision as `size`/`margin`) for a position.
 /// `size` is the notional exposure in USDC, entry/exit prices share the same decimals.
 pub fn calculate_pnl(

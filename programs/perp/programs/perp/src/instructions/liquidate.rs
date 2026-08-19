@@ -5,7 +5,7 @@ use anchor_spl::token_interface::{
 use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
 use crate::{
-    alliases::MicroUsdc, events::PositionLiquidated, oracle::convert_price_to_micro_usdc, position::{Position, PositionType}, syntetic_market::SynteticMarket, utils::pnl::{apply_funding, calculate_pnl}, PerpError, BAD_DEBT_KEEPER_REWARD_BPS, INSURANCE_FUND_VAULT, MARKET_VAULT, POSITION_SEED, PYTH_MAX_PRICE_AGE_SECONDS
+    alliases::MicroUsdc, events::PositionLiquidated, position::{Position, PositionType}, syntetic_market::SynteticMarket, utils::pnl::{apply_funding, calculate_pnl}, OracleAdapter, PerpError, BAD_DEBT_KEEPER_REWARD_BPS, INSURANCE_FUND_VAULT, MARKET_VAULT, POSITION_SEED
 };
 
 // Anyone can call this (permissionless keeper). No trade fee is charged here —
@@ -16,12 +16,8 @@ pub fn _liquidate(ctx: Context<Liquidate>) -> Result<()> {
     let position = &ctx.accounts.position;
 
     let feed_id: [u8; 32] = get_feed_id_from_hex(&market.feed_id)?;
-    let price = ctx.accounts.price_update.get_price_no_older_than(
-        &Clock::get()?,
-        PYTH_MAX_PRICE_AGE_SECONDS,
-        &feed_id,
-    )?;
-    let exit_price: MicroUsdc = convert_price_to_micro_usdc(&price)?;
+    let oracle_guard = OracleAdapter::new(&ctx.accounts.price_update, &feed_id);
+    let exit_price: MicroUsdc = oracle_guard.read_price_guarded(&Clock::get()?).map_err(|_| PerpError::OracleGuardReadFailed)?;
 
     // Settle funding accrued since the position was opened
     let collateral = apply_funding(
