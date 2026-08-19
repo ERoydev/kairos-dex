@@ -262,6 +262,19 @@ pub fn make_initialize_market_ix(
     )
 }
 
+pub fn make_update_caps_ix(
+    program_id: Pubkey,
+    authority: Pubkey,
+    market: Pubkey,
+    params: perp::instruction::UpdateCaps,
+) -> Instruction {
+    Instruction::new_with_bytes(
+        program_id,
+        &params.data(),
+        perp::accounts::UpdateCaps { authority, market }.to_account_metas(None),
+    )
+}
+
 pub fn make_initialize_pool_ix(
     lp_program_id: Pubkey,
     authority: Pubkey,

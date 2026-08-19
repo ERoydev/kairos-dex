@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::alliases::MicroUsdc;
+use crate::{alliases::MicroUsdc, syntetic_market::TvlScaledCaps};
 
 #[event]
 pub struct MarketInitialized {
@@ -29,6 +29,12 @@ pub struct MarketPaused {
     pub market: Pubkey,
     pub authority: Pubkey,
     pub is_active: bool,
+}
+
+#[event]
+pub struct CapsUpdated {
+    pub market: Pubkey,
+    pub caps: TvlScaledCaps,
 }
 
 #[event]

@@ -12,3 +12,6 @@ pub use initialize_market::*;
 
 pub mod market_pause;
 pub use market_pause::*;
+
+pub mod update_caps;
+pub use update_caps::*;

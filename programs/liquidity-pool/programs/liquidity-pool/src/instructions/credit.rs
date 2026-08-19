@@ -11,7 +11,6 @@ use crate::error::ErrorCode;
 
 // Credit (trader loses): perp pushes USDC → pool vault, pool PDA is not the signer.
 // Trader loses → the pool collects their loss as profit → credit the pool (money flows IN)
-
 pub fn _credit(ctx: Context<Credit>, amount: u64) -> Result<()> {
     // The caller here is an actual market.vault PDA, so it is the only thing that can call that.
     // TODO: Maybe is good idea to research how other protocols implement that since it is good idea to have something 

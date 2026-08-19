@@ -60,4 +60,8 @@ pub mod perp {
     pub fn market_pause(ctx: Context<MarketPause>, is_active: bool) -> Result<()> {
         _market_pause(ctx, is_active)
     }
+
+    pub fn update_caps(ctx: Context<UpdateCaps>, params: UpdateCapsParams) -> Result<()> {
+        _update_caps(ctx, params)
+    }
 }
