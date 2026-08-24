@@ -15,7 +15,10 @@ surfpool run deployment --env localnet
 Both programs end up live on the one surfnet. If you rebuild liquidi run deployment --env localnet again to redeploy — there's no --watch
 surfpool run deployment --env localnet
 
-Both programs end up live on the one surfnet. If you rebuild liquidi run deployment --env localnet again to redeploy — there's no --watch equivalent across two separate txtx.yml projects targeting the same validator.
+Both programs end up live on the one surfnet. If you rebuild liquidity run deployment --env localnet again to redeploy — there's no --watch equivalent across two separate txtx.yml projects targeting the same validator.
+
+Note:
+Have in mind Surfpool runbook supervisor have an UI that default opens a browser at `localhost:8488` so i reveiw the exact transaction (deploy program, upgrade, etc.) before they get signed and broadcast.
 
 # Run tests
 

@@ -24,7 +24,8 @@ custom-panic = []
 [dependencies]
 anchor-lang = "1.1.2"
 anchor-spl = "1.1.2"
-pyth-solana-receiver-sdk = "2.0.0" 
+pyth-solana-receiver-sdk = "2.0.0"
+solana-instructions-sysvar = "3.0.0"
 
 # Add LP pool as dependency to allow CPI to credit/debit
 [dependencies.liquidity-pool]

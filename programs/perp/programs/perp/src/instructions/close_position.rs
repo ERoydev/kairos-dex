@@ -18,6 +18,7 @@ use crate::{
 };
 
 use liquidity_pool::Pool;
+use solana_instructions_sysvar::ID as INSTRUCTIONS_SYSVAR_ID;
 
 // Closing is allowed even while the market is paused (`is_active = false`) —
 // pause only blocks new positions, it shouldn't trap traders already in one.
@@ -170,6 +171,10 @@ pub struct ClosePosition<'info> {
 
     // --- System accounts
     pub token_program: Interface<'info, TokenInterface>,
+
+    /// CHECK: address-constrained to the instructions sysvar; forwarded to liquidity-pool's credit/debit CPI for caller introspection
+    #[account(address = INSTRUCTIONS_SYSVAR_ID)]
+    pub instructions_sysvar: UncheckedAccount<'info>,
 }
 
 impl<'info> ClosePosition<'info> {
@@ -230,6 +235,7 @@ impl<'info> ClosePosition<'info> {
             usdc_mint: self.usdc_mint.to_account_info(),
             usdc_vault: self.lp_pool_usdc_vault.to_account_info(),
             token_program: self.token_program.to_account_info(),
+            instructions: self.instructions_sysvar.to_account_info(),
         };
         let cpi_ctx =
             CpiContext::new_with_signer(self.lp_pool_program.key(), cpi_accounts, vault_seeds);
@@ -251,6 +257,7 @@ impl<'info> ClosePosition<'info> {
             destination: self.trader_usdc_ata.to_account_info(),
             usdc_mint: self.usdc_mint.to_account_info(),
             token_program: self.token_program.to_account_info(),
+            instructions: self.instructions_sysvar.to_account_info(),
         };
         let cpi_ctx =
             CpiContext::new_with_signer(self.lp_pool_program.key(), cpi_accounts, vault_seeds);

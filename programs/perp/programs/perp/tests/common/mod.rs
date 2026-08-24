@@ -367,6 +367,7 @@ pub fn make_open_position_ix(
             usdc_mint,
             token_program: anchor_spl::token::ID,
             system_program: system_program::ID,
+            instructions_sysvar: solana_instructions_sysvar::ID,
         }
         .to_account_metas(None),
     )
@@ -405,6 +406,7 @@ pub fn make_close_position_ix(
             trader_usdc_ata,
             usdc_mint,
             token_program: anchor_spl::token::ID,
+            instructions_sysvar: solana_instructions_sysvar::ID,
         }
         .to_account_metas(None),
     )

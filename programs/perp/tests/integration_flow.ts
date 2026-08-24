@@ -143,7 +143,7 @@ describe("perp: full integration flow (surfpool)", () => {
       priceUpdateAccount.toBase58(),
       {
         lamports: 1_000_000_000,
-        data: [data.toString("base64"), "base64"],
+        data: data.toString("hex"),
         owner: PYTH_RECEIVER_PROGRAM_ID.toBase58(),
         executable: false,
       },
@@ -220,7 +220,12 @@ describe("perp: full integration flow (surfpool)", () => {
     // Seed USDC balances directly via cheatcode — real mainnet USDC has no
     // mint authority we control, so we can't just mintTo().
     await setUsdcBalance(trader.publicKey, 10_000_000_000n); // 10,000 USDC
-    await setUsdcBalance(lpProvider.publicKey, 1_000_000_000n); // 1,000 USDC
+    // LP TVL must be large relative to the position opened below: risk caps
+    // (max_position_notional, max_skew, ...) are bps of TVL — see
+    // utils/caps.rs `compute_caps` — and a 1,000 USDC/5x position (5,000
+    // USDC notional) needs TVL >= ~500,000 USDC just to clear the 1%
+    // max_position_notional cap.
+    await setUsdcBalance(lpProvider.publicKey, 700_000_000_000n); // 700,000 USDC
     await setUsdcBalance(feeReceiver, 0n); // just to materialize the ATA
   });
 
@@ -254,7 +259,35 @@ describe("perp: full integration flow (surfpool)", () => {
     expect(pool.perpProgram.toBase58()).to.equal(perp.programId.toBase58());
   });
 
+  it("LP provider deposits into the pool", async () => {
+    const depositAmount = 600_000_000_000n; // 600,000 USDC
+
+    await lpPool.methods
+      .deposit(new BN(depositAmount.toString()))
+      .accounts({
+        provider: lpProvider.publicKey,
+      })
+      .signers([lpProvider])
+      .rpc();
+
+    const pool = await lpPool.account.pool.fetch(lpPoolPda);
+    expect(BigInt(pool.totalAssets.toString())).to.equal(depositAmount);
+    expect(BigInt(pool.totalShares.toString())).to.equal(depositAmount); // 1:1, first deposit
+
+    const lpShareBal = await provider.connection.getTokenAccountBalance(lpProviderLpAta);
+    expect(BigInt(lpShareBal.value.amount)).to.equal(depositAmount);
+
+    const providerUsdcAfter = await usdcBalanceOf(lpProvider.publicKey);
+    expect(providerUsdcAfter).to.equal(700_000_000_000n - depositAmount);
+  });
+
   it("initializes the market", async () => {
+    // Must run after the LP deposit above: initialize_market snapshots
+    // risk caps (including max_skew) as a percentage of the LP pool's TVL
+    // at this moment (see utils/caps.rs `compute_caps`) and never
+    // recomputes them automatically — a market initialized against a
+    // zero-TVL pool gets a permanent max_skew of 0, which would reject
+    // every position open below with MaxSkewLimitExceeded.
     await perp.methods
       .initializeMarket(symbolToBytes(symbol), {
         maxLeverage: 20,
@@ -282,28 +315,6 @@ describe("perp: full integration flow (surfpool)", () => {
     // hiding it; flag to the program owner if this should be fixed.
     const global = await perp.account.globalConfig.fetch(globalConfigPda);
     expect(global.marketsCount).to.equal(0);
-  });
-
-  it("LP provider deposits into the pool", async () => {
-    const depositAmount = 500_000_000n; // 500 USDC
-
-    await lpPool.methods
-      .deposit(new BN(depositAmount.toString()))
-      .accounts({
-        provider: lpProvider.publicKey,
-      })
-      .signers([lpProvider])
-      .rpc();
-
-    const pool = await lpPool.account.pool.fetch(lpPoolPda);
-    expect(BigInt(pool.totalAssets.toString())).to.equal(depositAmount);
-    expect(BigInt(pool.totalShares.toString())).to.equal(depositAmount); // 1:1, first deposit
-
-    const lpShareBal = await provider.connection.getTokenAccountBalance(lpProviderLpAta);
-    expect(BigInt(lpShareBal.value.amount)).to.equal(depositAmount);
-
-    const providerUsdcAfter = await usdcBalanceOf(lpProvider.publicKey);
-    expect(providerUsdcAfter).to.equal(1_000_000_000n - depositAmount);
   });
 
   it("trader opens a position", async () => {
@@ -343,7 +354,11 @@ describe("perp: full integration flow (surfpool)", () => {
     expect(position.owner.toBase58()).to.equal(trader.publicKey.toBase58());
     expect(position.market.toBase58()).to.equal(marketPda.toBase58());
     expect(position.side).to.deep.equal({ long: {} });
-    expect(position.entryPrice.toNumber()).to.equal(Number(ORACLE_PRICE));
+    // On-chain entry_price is stored as MicroUsdc (6 decimals), converted from
+    // the raw Pyth price (exponent -8) via `price / 100` — see oracle.rs
+    // `normalize_price_to_microusdc`. ORACLE_PRICE is in the raw 10^-8 scale,
+    // so it must be divided down to compare against the stored value.
+    expect(position.entryPrice.toNumber()).to.equal(Number(ORACLE_PRICE / 100n));
     // margin fully backs the position at 5x before fees; collateral is margin minus open fee.
     expect(position.collateral.toNumber()).to.be.greaterThan(0);
     expect(position.collateral.toNumber()).to.be.at.most(Number(margin));

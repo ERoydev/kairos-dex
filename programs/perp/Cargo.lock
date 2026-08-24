@@ -2309,6 +2309,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "solana-instructions-sysvar 3.0.1",
 ]
 
 [[package]]
@@ -2662,6 +2663,7 @@ dependencies = [
  "litesvm-token",
  "pyth-solana-receiver-sdk",
  "solana-account 3.4.0",
+ "solana-instructions-sysvar 3.0.1",
  "solana-keypair",
  "solana-message 3.1.0",
  "solana-sdk",

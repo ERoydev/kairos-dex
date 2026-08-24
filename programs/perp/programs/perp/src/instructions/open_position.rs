@@ -17,6 +17,7 @@ use crate::{
 // This imports the credit function and Credit accounts struct from liquidity-pool
 // #program macro auto-generates a cpi module gated behind feature `cpi`, containing wrapper fn per ix plus a matching cpi::accounts::* struct for each.
 use liquidity_pool::Pool;
+use solana_instructions_sysvar::ID as INSTRUCTIONS_SYSVAR_ID;
 
 pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) -> Result<()> {
     require!(ctx.accounts.market.is_active, PerpError::MarketPaused);
@@ -212,6 +213,10 @@ pub struct OpenPosition<'info> {
     // --- System accounts
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
+
+    /// CHECK: address-constrained to the instructions sysvar; forwarded to liquidity-pool's credit CPI for caller introspection
+    #[account(address = INSTRUCTIONS_SYSVAR_ID)]
+    pub instructions_sysvar: UncheckedAccount<'info>,
 }
 
 impl<'info> OpenPosition<'info> {
@@ -258,6 +263,7 @@ impl<'info> OpenPosition<'info> {
             usdc_mint: self.usdc_mint.to_account_info(),
             usdc_vault: self.lp_pool_usdc_vault.to_account_info(),
             token_program: self.token_program.to_account_info(),
+            instructions: self.instructions_sysvar.to_account_info(),
         };
         let cpi_ctx =
             CpiContext::new_with_signer(self.lp_pool_program.key(), cpi_accounts, vault_seeds);
