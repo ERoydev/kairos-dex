@@ -1,15 +1,15 @@
+use crate::constants::{LIQUIDITY_POOL_SEED, LP_MINT_SEED, USDC_VAULT_SEED};
+use crate::error::ErrorCode;
+use crate::state::pool::Pool;
+#[cfg(feature = "dev")]
+use crate::DEFAULT_DECIMALS;
+#[cfg(not(feature = "dev"))]
+use crate::{DEFAULT_DECIMALS, USDC_MINT};
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{burn, transfer, Burn, Mint, Token, TokenAccount, Transfer},
 };
-#[cfg(not(feature = "dev"))]
-use crate::{DEFAULT_DECIMALS, USDC_MINT};
-#[cfg(feature = "dev")]
-use crate::DEFAULT_DECIMALS;
-use crate::state::pool::Pool;
-use crate::constants::{LIQUIDITY_POOL_SEED, LP_MINT_SEED, USDC_VAULT_SEED};
-use crate::error::ErrorCode;
 
 /// LP burns LP shares → program sends them back proportional USDC.
 pub fn _withdraw(ctx: Context<Withdraw>, lp_amount: u64) -> Result<()> {
@@ -19,7 +19,8 @@ pub fn _withdraw(ctx: Context<Withdraw>, lp_amount: u64) -> Result<()> {
 
     require!(pool.total_shares > 0, ErrorCode::ZeroShares);
 
-    let usdc_to_return = Withdraw::calc_usdc_to_return(pool.total_shares, pool.total_assets, lp_amount);
+    let usdc_to_return =
+        Withdraw::calc_usdc_to_return(pool.total_shares, pool.total_assets, lp_amount);
     let pool_bump = pool.bump;
 
     // Burn LP tokens from provider's LP ATA (provider signs as token account owner)
@@ -37,7 +38,9 @@ pub fn _withdraw(ctx: Context<Withdraw>, lp_amount: u64) -> Result<()> {
 
     msg!(
         "User: {}, burns LP amount: {}, receives USDC: {}",
-        provider.key(), lp_amount, usdc_to_return
+        provider.key(),
+        lp_amount,
+        usdc_to_return
     );
 
     // Transfer USDC from vault to provider, pool PDA signs as vault authority

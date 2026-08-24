@@ -50,7 +50,10 @@ pub fn _initialize_market(
     market.funding_config = FundingConfig::default();
 
     market.is_active = true;
-    global_config.markets_count.checked_add(1).ok_or(PerpError::MathOverflow)?;
+    global_config
+        .markets_count
+        .checked_add(1)
+        .ok_or(PerpError::MathOverflow)?;
 
     emit!(MarketInitialized {
         market: ctx.accounts.market.key(),

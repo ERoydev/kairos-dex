@@ -1,18 +1,17 @@
+use crate::constants::{LIQUIDITY_POOL_SEED, LP_MINT_SEED, USDC_VAULT_SEED};
+use crate::state::pool::Pool;
+#[cfg(feature = "dev")]
+use crate::DEFAULT_DECIMALS;
+#[cfg(not(feature = "dev"))]
+use crate::{DEFAULT_DECIMALS, USDC_MINT};
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{mint_to, transfer, Mint, MintTo, Token, TokenAccount, Transfer},
 };
-#[cfg(not(feature = "dev"))]
-use crate::{DEFAULT_DECIMALS, USDC_MINT};
-#[cfg(feature = "dev")]
-use crate::DEFAULT_DECIMALS;
-use crate::state::pool::Pool;
-use crate::constants::{LIQUIDITY_POOL_SEED, LP_MINT_SEED, USDC_VAULT_SEED};
 
 /// LP sends USDC → program mints them LP shares based on current share price.
 pub fn _deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-
     let provider_ata = &mut ctx.accounts.provider_ata;
     let token_program = &ctx.accounts.token_program;
     let usdc_vault = &mut ctx.accounts.usdc_vault;
@@ -25,13 +24,14 @@ pub fn _deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         Transfer {
             from: provider_ata.to_account_info(),
             to: usdc_vault.to_account_info(),
-            authority: provider.to_account_info()
-        }
+            authority: provider.to_account_info(),
+        },
     );
 
     msg!(
         "User: {}, send USDC amount: {} to vault",
-        provider.key(), amount
+        provider.key(),
+        amount
     );
 
     transfer(transfer_token_cpi, amount)?;
@@ -51,8 +51,7 @@ pub fn _deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
             // The PDA must sign as authority
             &[&[LIQUIDITY_POOL_SEED, &[pool_bump]]],
         ),
-        amount_to_mint
-
+        amount_to_mint,
     )?;
 
     // Update pool accounting

@@ -1,9 +1,9 @@
-use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
-use crate::{DEFAULT_DECIMALS, LP_MINT_SEED, POOL_VERSION, USDC_MINT};
-use crate::state::pool::Pool;
 use crate::constants::{LIQUIDITY_POOL_SEED, USDC_VAULT_SEED};
 use crate::error::ErrorCode;
+use crate::state::pool::Pool;
+use crate::{DEFAULT_DECIMALS, LP_MINT_SEED, POOL_VERSION, USDC_MINT};
+use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 /// Initialize the pool and the LP token mint that is going to be minted to providers
 pub fn _initialize_pool(ctx: Context<InitializePool>) -> Result<()> {

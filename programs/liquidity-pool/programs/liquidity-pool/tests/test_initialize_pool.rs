@@ -14,7 +14,7 @@ use {
 };
 
 use anchor_lang::pubkey;
-use liquidity_pool::{Pool, USDC_VAULT_SEED, LP_MINT_SEED};
+use liquidity_pool::{Pool, LP_MINT_SEED, USDC_VAULT_SEED};
 use litesvm_token::CreateMint;
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 
@@ -55,15 +55,33 @@ fn test_initialize_pool() {
     let payer = Keypair::new();
     svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
 
-    let bytes = include_bytes!(concat!(env!("CARGO_TARGET_TMPDIR"), "/../deploy/liquidity_pool.so"));
+    let bytes = include_bytes!(concat!(
+        env!("CARGO_TARGET_TMPDIR"),
+        "/../deploy/liquidity_pool.so"
+    ));
     svm.add_program(program_id, bytes).unwrap();
 
-    let (pool, _) = Pubkey::find_program_address(&[liquidity_pool::constants::LIQUIDITY_POOL_SEED], &program_id);
-    let usdc_mint = CreateMint::new(&mut svm, &payer).authority(&payer.pubkey()).decimals(USDC_DECIMALS).send().unwrap();
+    let (pool, _) = Pubkey::find_program_address(
+        &[liquidity_pool::constants::LIQUIDITY_POOL_SEED],
+        &program_id,
+    );
+    let usdc_mint = CreateMint::new(&mut svm, &payer)
+        .authority(&payer.pubkey())
+        .decimals(USDC_DECIMALS)
+        .send()
+        .unwrap();
     let (usdc_vault, _) = Pubkey::find_program_address(&[USDC_VAULT_SEED], &program_id);
     let (lp_mint, _) = Pubkey::find_program_address(&[LP_MINT_SEED], &program_id);
 
-    let ix = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault, lp_mint, FAKE_PERP_PROGRAM);
+    let ix = make_initialize_pool_ix(
+        program_id,
+        pool,
+        payer.pubkey(),
+        usdc_mint,
+        usdc_vault,
+        lp_mint,
+        FAKE_PERP_PROGRAM,
+    );
     let blockhash = svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&payer.pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer]).unwrap();
@@ -91,23 +109,48 @@ fn test_initialize_pool_already_exists() {
     let payer = Keypair::new();
     svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
 
-    let bytes = include_bytes!(concat!(env!("CARGO_TARGET_TMPDIR"), "/../deploy/liquidity_pool.so"));
+    let bytes = include_bytes!(concat!(
+        env!("CARGO_TARGET_TMPDIR"),
+        "/../deploy/liquidity_pool.so"
+    ));
     svm.add_program(program_id, bytes).unwrap();
 
-    let (pool, _) = Pubkey::find_program_address(&[liquidity_pool::constants::LIQUIDITY_POOL_SEED], &program_id);
-    let usdc_mint = CreateMint::new(&mut svm, &payer).authority(&payer.pubkey()).decimals(USDC_DECIMALS).send().unwrap();
+    let (pool, _) = Pubkey::find_program_address(
+        &[liquidity_pool::constants::LIQUIDITY_POOL_SEED],
+        &program_id,
+    );
+    let usdc_mint = CreateMint::new(&mut svm, &payer)
+        .authority(&payer.pubkey())
+        .decimals(USDC_DECIMALS)
+        .send()
+        .unwrap();
     let (usdc_vault, _) = Pubkey::find_program_address(&[USDC_VAULT_SEED], &program_id);
     let (lp_mint, _) = Pubkey::find_program_address(&[LP_MINT_SEED], &program_id);
 
-    let ix = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault, lp_mint, FAKE_PERP_PROGRAM);
+    let ix = make_initialize_pool_ix(
+        program_id,
+        pool,
+        payer.pubkey(),
+        usdc_mint,
+        usdc_vault,
+        lp_mint,
+        FAKE_PERP_PROGRAM,
+    );
     let blockhash = svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&payer.pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer]).unwrap();
     svm.send_transaction(tx).unwrap();
 
-    
     let fake_perp_program = Pubkey::new_unique();
-    let ix2 = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault, lp_mint, fake_perp_program);
+    let ix2 = make_initialize_pool_ix(
+        program_id,
+        pool,
+        payer.pubkey(),
+        usdc_mint,
+        usdc_vault,
+        lp_mint,
+        fake_perp_program,
+    );
     let blockhash = svm.latest_blockhash();
     let msg2 = Message::new_with_blockhash(&[ix2], Some(&payer.pubkey()), &blockhash);
     let tx2 = VersionedTransaction::try_new(VersionedMessage::Legacy(msg2), &[&payer]).unwrap();

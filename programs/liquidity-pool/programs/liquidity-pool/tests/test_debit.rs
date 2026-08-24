@@ -205,13 +205,16 @@ fn test_debit() {
     let (mut svm, payer, pool, usdc_mint, usdc_vault, lp_mint) = setup(perp_keypair.pubkey());
     let program_id = liquidity_pool::id();
 
-    svm.airdrop(&perp_keypair.pubkey(), LAMPORTS_PER_SOL).unwrap();
+    svm.airdrop(&perp_keypair.pubkey(), LAMPORTS_PER_SOL)
+        .unwrap();
 
     let pool_funds = 1_000 * 1_000_000u64; // 1000 USDC deposited by LP provider
-    let debit_amount = 300 * 1_000_000u64;  // 300 USDC paid out to winning trader
+    let debit_amount = 300 * 1_000_000u64; // 300 USDC paid out to winning trader
 
     // Seed the pool with funds via a normal LP deposit so there is something to debit.
-    fund_pool(&mut svm, &payer, pool, usdc_mint, usdc_vault, lp_mint, pool_funds);
+    fund_pool(
+        &mut svm, &payer, pool, usdc_mint, usdc_vault, lp_mint, pool_funds,
+    );
 
     // trader_ata is where the pool sends the payout (simulates winning trader's wallet).
     let trader = Keypair::new();
@@ -233,9 +236,8 @@ fn test_debit() {
     let msg = Message::new_with_blockhash(&[debit_ix], Some(&payer.pubkey()), &blockhash);
     // Both payer (fee payer) and perp_keypair (caller/signer) must sign.
     // In production, perp_keypair is replaced by the perp program signing via invoke_signed.
-    let tx =
-        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &perp_keypair])
-            .unwrap();
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &perp_keypair])
+        .unwrap();
     let res = svm.send_transaction(tx);
     assert!(res.is_ok(), "debit failed: {:?}", res.err());
 
@@ -257,7 +259,15 @@ fn test_debit_unauthorized() {
     let (mut svm, payer, pool, usdc_mint, usdc_vault, lp_mint) = setup(perp_keypair.pubkey());
     let program_id = liquidity_pool::id();
 
-    fund_pool(&mut svm, &payer, pool, usdc_mint, usdc_vault, lp_mint, 1_000 * 1_000_000u64);
+    fund_pool(
+        &mut svm,
+        &payer,
+        pool,
+        usdc_mint,
+        usdc_vault,
+        lp_mint,
+        1_000 * 1_000_000u64,
+    );
 
     let intruder = Keypair::new();
     svm.airdrop(&intruder.pubkey(), LAMPORTS_PER_SOL).unwrap();
@@ -279,8 +289,7 @@ fn test_debit_unauthorized() {
     );
     let msg = Message::new_with_blockhash(&[debit_ix], Some(&payer.pubkey()), &blockhash);
     let tx =
-        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &intruder])
-            .unwrap();
+        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &intruder]).unwrap();
     let res = svm.send_transaction(tx);
     assert!(res.is_err(), "expected unauthorized error");
 }
@@ -292,10 +301,13 @@ fn test_debit_insufficient_funds() {
     let (mut svm, payer, pool, usdc_mint, usdc_vault, lp_mint) = setup(perp_keypair.pubkey());
     let program_id = liquidity_pool::id();
 
-    svm.airdrop(&perp_keypair.pubkey(), LAMPORTS_PER_SOL).unwrap();
+    svm.airdrop(&perp_keypair.pubkey(), LAMPORTS_PER_SOL)
+        .unwrap();
 
     let pool_funds = 100 * 1_000_000u64;
-    fund_pool(&mut svm, &payer, pool, usdc_mint, usdc_vault, lp_mint, pool_funds);
+    fund_pool(
+        &mut svm, &payer, pool, usdc_mint, usdc_vault, lp_mint, pool_funds,
+    );
 
     let trader = Keypair::new();
     let destination = CreateAssociatedTokenAccount::new(&mut svm, &payer, &usdc_mint)
@@ -314,9 +326,8 @@ fn test_debit_insufficient_funds() {
         pool_funds + 1, // one lamport more than the pool holds
     );
     let msg = Message::new_with_blockhash(&[debit_ix], Some(&payer.pubkey()), &blockhash);
-    let tx =
-        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &perp_keypair])
-            .unwrap();
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &perp_keypair])
+        .unwrap();
     let res = svm.send_transaction(tx);
     assert!(res.is_err(), "expected insufficient funds error");
 }

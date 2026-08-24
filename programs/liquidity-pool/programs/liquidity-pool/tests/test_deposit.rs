@@ -1,3 +1,4 @@
+use anchor_lang::pubkey;
 use anchor_lang::{
     prelude::Pubkey,
     solana_program::{instruction::Instruction, system_program},
@@ -11,7 +12,6 @@ use solana_message::{Message, VersionedMessage};
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
-use anchor_lang::pubkey;
 
 use liquidity_pool::{Pool, LP_MINT_SEED, USDC_VAULT_SEED};
 
@@ -114,7 +114,15 @@ fn test_deposit() {
 
     // Initialize the pool.
     let blockhash = svm.latest_blockhash();
-    let init_ix = make_initialize_pool_ix(program_id, pool, payer.pubkey(), usdc_mint, usdc_vault, lp_mint, FAKE_PERP_PROGRAM);
+    let init_ix = make_initialize_pool_ix(
+        program_id,
+        pool,
+        payer.pubkey(),
+        usdc_mint,
+        usdc_vault,
+        lp_mint,
+        FAKE_PERP_PROGRAM,
+    );
     let msg = Message::new_with_blockhash(&[init_ix], Some(&payer.pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer]).unwrap();
     svm.send_transaction(tx).unwrap();

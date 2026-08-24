@@ -1,20 +1,19 @@
-use anchor_lang::prelude::*;
-use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
-#[cfg(not(feature = "dev"))]
-use crate::{DEFAULT_DECIMALS, USDC_MINT};
-#[cfg(feature = "dev")]
-use crate::DEFAULT_DECIMALS;
-use crate::state::pool::Pool;
 use crate::constants::{LIQUIDITY_POOL_SEED, USDC_VAULT_SEED};
 use crate::error::ErrorCode;
+use crate::state::pool::Pool;
+#[cfg(feature = "dev")]
+use crate::DEFAULT_DECIMALS;
+#[cfg(not(feature = "dev"))]
+use crate::{DEFAULT_DECIMALS, USDC_MINT};
+use anchor_lang::prelude::*;
+use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 use solana_instructions_sysvar::{get_instruction_relative, ID as INSTRUCTIONS_SYSVAR_ID};
-
 
 // Credit (trader loses): perp pushes USDC → pool vault, pool PDA is not the signer.
 // Trader loses → the pool collects their loss as profit → credit the pool (money flows IN)
 pub fn _credit(ctx: Context<Credit>, amount: u64) -> Result<()> {
     // The caller here is an actual market.vault PDA, so it is the only thing that can call that.
-    // TODO: Maybe is good idea to research how other protocols implement that since it is good idea to have something 
+    // TODO: Maybe is good idea to research how other protocols implement that since it is good idea to have something
     // like whitelist with allowed market vaults or another way to validate authenticity when calling this instruction
     let caller = &ctx.accounts.caller;
     let pool = &ctx.accounts.pool;
@@ -31,7 +30,10 @@ pub fn _credit(ctx: Context<Credit>, amount: u64) -> Result<()> {
     // was the one dispatched by this transaction.
     let calling_ix = get_instruction_relative(0, &ctx.accounts.instructions.to_account_info())
         .map_err(|_| ErrorCode::Unauthorized)?;
-    require!(calling_ix.program_id == perp_program, ErrorCode::Unauthorized);
+    require!(
+        calling_ix.program_id == perp_program,
+        ErrorCode::Unauthorized
+    );
 
     let transfer_cpi = CpiContext::new(
         token_program.key(),

@@ -131,10 +131,7 @@ fn test_update_caps_ok() {
         data.risk_management.caps.max_oi_short,
         params.max_oi_short.unwrap()
     );
-    assert_eq!(
-        data.risk_management.caps.max_skew,
-        params.max_skew.unwrap()
-    );
+    assert_eq!(data.risk_management.caps.max_skew, params.max_skew.unwrap());
 }
 
 #[test]

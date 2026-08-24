@@ -1,12 +1,12 @@
-use anchor_lang::prelude::*;
-use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
-#[cfg(not(feature = "dev"))]
-use crate::{DEFAULT_DECIMALS, USDC_MINT};
-#[cfg(feature = "dev")]
-use crate::DEFAULT_DECIMALS;
-use crate::state::pool::Pool;
 use crate::constants::{LIQUIDITY_POOL_SEED, USDC_VAULT_SEED};
 use crate::error::ErrorCode;
+use crate::state::pool::Pool;
+#[cfg(feature = "dev")]
+use crate::DEFAULT_DECIMALS;
+#[cfg(not(feature = "dev"))]
+use crate::{DEFAULT_DECIMALS, USDC_MINT};
+use anchor_lang::prelude::*;
+use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 use solana_instructions_sysvar::{get_instruction_relative, ID as INSTRUCTIONS_SYSVAR_ID};
 
 /// Perp contract CPIs here when the pool pays out USDC (trader wins).
@@ -19,14 +19,21 @@ pub fn _debit(ctx: Context<Debit>, amount: u64) -> Result<()> {
     // than a direct key/owner comparison against `caller`.
     let calling_ix = get_instruction_relative(0, &ctx.accounts.instructions.to_account_info())
         .map_err(|_| ErrorCode::Unauthorized)?;
-    require!(calling_ix.program_id == perp_program, ErrorCode::Unauthorized);
+    require!(
+        calling_ix.program_id == perp_program,
+        ErrorCode::Unauthorized
+    );
 
     // Solvency: pool must be able to cover the payout
     require!(pool.total_assets >= amount, ErrorCode::InsufficientFunds);
-    
+
     let pool_bump = pool.bump;
 
-    msg!("Debit pool: {} USDC to {}", amount, ctx.accounts.destination.key());
+    msg!(
+        "Debit pool: {} USDC to {}",
+        amount,
+        ctx.accounts.destination.key()
+    );
     transfer(
         CpiContext::new_with_signer(
             token_program.key(),

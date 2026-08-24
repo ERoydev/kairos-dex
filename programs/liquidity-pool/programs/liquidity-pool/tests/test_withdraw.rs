@@ -1,3 +1,4 @@
+use anchor_lang::pubkey;
 use anchor_lang::{
     prelude::Pubkey,
     solana_program::{instruction::Instruction, system_program},
@@ -11,7 +12,6 @@ use solana_message::{Message, VersionedMessage};
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
-use anchor_lang::pubkey;
 
 use liquidity_pool::{Pool, LP_MINT_SEED, USDC_VAULT_SEED};
 
@@ -237,7 +237,7 @@ fn test_partial_withdraw() {
     let program_id = liquidity_pool::id();
 
     let deposit_amount = 1_000 * 1_000_000u64; // 1000 USDC
-    let withdraw_lp = 400 * 1_000_000u64;       // redeem 400 LP tokens
+    let withdraw_lp = 400 * 1_000_000u64; // redeem 400 LP tokens
 
     let provider_ata = CreateAssociatedTokenAccount::new(&mut svm, &payer, &usdc_mint)
         .owner(&payer.pubkey())

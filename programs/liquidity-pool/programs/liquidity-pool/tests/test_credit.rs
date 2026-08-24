@@ -124,7 +124,8 @@ fn test_credit() {
     let (mut svm, payer, pool, usdc_mint, usdc_vault, _lp_mint) = setup(perp_keypair.pubkey());
     let program_id = liquidity_pool::id();
 
-    svm.airdrop(&perp_keypair.pubkey(), LAMPORTS_PER_SOL).unwrap();
+    svm.airdrop(&perp_keypair.pubkey(), LAMPORTS_PER_SOL)
+        .unwrap();
 
     let credit_amount = 500 * 1_000_000u64; // 500 USDC
 
@@ -151,9 +152,8 @@ fn test_credit() {
     let msg = Message::new_with_blockhash(&[credit_ix], Some(&payer.pubkey()), &blockhash);
     // Both payer (fee payer) and perp_keypair (caller/signer) must sign.
     // In production, perp_keypair is replaced by the perp program signing via invoke_signed.
-    let tx =
-        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &perp_keypair])
-            .unwrap();
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &perp_keypair])
+        .unwrap();
     let res = svm.send_transaction(tx);
     assert!(res.is_ok(), "credit failed: {:?}", res.err());
 
@@ -206,8 +206,7 @@ fn test_credit_unauthorized() {
     );
     let msg = Message::new_with_blockhash(&[credit_ix], Some(&payer.pubkey()), &blockhash);
     let tx =
-        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &intruder])
-            .unwrap();
+        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &intruder]).unwrap();
     let res = svm.send_transaction(tx);
     assert!(res.is_err(), "expected unauthorized error");
 }
