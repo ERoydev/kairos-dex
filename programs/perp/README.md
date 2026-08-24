@@ -22,5 +22,16 @@ Have in mind Surfpool runbook supervisor have an UI that default opens a browser
 
 # Run tests
 
+Automated (recommended) — builds both programs, starts surfpool, deploys
+liquidity-pool into it, runs `anchor test`, then tears surfpool down again:
+
+cd programs/perp
+make integration-test
+# or directly: ./test-integration.sh
+
+Manual — same flow as above but run by hand, useful if you want the runbook
+supervisor UI (localhost:8488) open to review transactions before they're
+signed and broadcast:
+
 cd programs/perp
 anchor test

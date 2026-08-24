@@ -8,8 +8,10 @@ test:
 	cargo build-sbf --features dev && cargo test --features dev
 
 start:
-	# watch auto-redeploys on recompile 	
+	# watch auto-redeploys on recompile
 	surfpool start --watch
 
+integration-test:
+	./test-integration.sh
 
 # surfpool run deployment --env localnet
