@@ -91,6 +91,7 @@ fn make_debit_ix(
             destination,
             usdc_mint,
             token_program: anchor_spl::token::ID,
+            instructions: solana_instructions_sysvar::ID,
         }
         .to_account_metas(None),
     )

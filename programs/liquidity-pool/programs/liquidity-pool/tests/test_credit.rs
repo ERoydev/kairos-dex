@@ -61,6 +61,7 @@ fn make_credit_ix(
             usdc_mint,
             usdc_vault,
             token_program: anchor_spl::token::ID,
+            instructions: solana_instructions_sysvar::ID,
         }
         .to_account_metas(None),
     )

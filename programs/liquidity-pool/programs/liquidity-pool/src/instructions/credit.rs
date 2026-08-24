@@ -7,6 +7,7 @@ use crate::DEFAULT_DECIMALS;
 use crate::state::pool::Pool;
 use crate::constants::{LIQUIDITY_POOL_SEED, USDC_VAULT_SEED};
 use crate::error::ErrorCode;
+use solana_instructions_sysvar::{get_instruction_relative, ID as INSTRUCTIONS_SYSVAR_ID};
 
 
 // Credit (trader loses): perp pushes USDC → pool vault, pool PDA is not the signer.
@@ -20,8 +21,17 @@ pub fn _credit(ctx: Context<Credit>, amount: u64) -> Result<()> {
     let token_program = &ctx.accounts.token_program;
     let perp_program = pool.perp_program;
 
-    // Only the pool program can call this via CPI
-    require!(caller.key() == perp_program, ErrorCode::Unauthorized);
+    // Only the perp program may reach this instruction. A PDA signer's address
+    // is never equal to the program id that derived it, and a token account's
+    // AccountInfo.owner is always the token program — neither can be compared
+    // directly to perp_program. Instead check which program owns the
+    // transaction's currently-executing top-level instruction (instruction
+    // introspection via the instructions sysvar): since perp CPIs into this
+    // instruction directly, that's perp_program if and only if perp itself
+    // was the one dispatched by this transaction.
+    let calling_ix = get_instruction_relative(0, &ctx.accounts.instructions.to_account_info())
+        .map_err(|_| ErrorCode::Unauthorized)?;
+    require!(calling_ix.program_id == perp_program, ErrorCode::Unauthorized);
 
     let transfer_cpi = CpiContext::new(
         token_program.key(),
@@ -80,4 +90,8 @@ pub struct Credit<'info> {
     pub usdc_vault: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
+
+    /// CHECK: address-constrained to the instructions sysvar; used for CPI-caller introspection
+    #[account(address = INSTRUCTIONS_SYSVAR_ID)]
+    pub instructions: UncheckedAccount<'info>,
 }

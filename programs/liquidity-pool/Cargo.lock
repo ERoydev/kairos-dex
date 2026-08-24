@@ -1640,6 +1640,7 @@ dependencies = [
  "anchor-spl",
  "litesvm",
  "litesvm-token",
+ "solana-instructions-sysvar",
  "solana-keypair",
  "solana-message 3.1.0",
  "solana-sdk",
