@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("4ZuUyESpBpUfAYperMNg9h6uzKMCNjfL47RsNfD3TnLL");
+declare_id!("EvfapscrVw8DTdMWKk6udmgbb5esZz7fF83ZPiHdYWKn");
 
 #[program]
 pub mod liquidity_pool {
