@@ -33,8 +33,17 @@ impl HealthState {
     }
 }
 
+impl Default for HealthState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn now() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
 }
 
 pub async fn health_handler(
@@ -51,6 +60,10 @@ pub async fn health_handler(
         "last_event_at": last_event_at,
     });
 
-    let status = if healthy { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
+    let status = if healthy {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
     (status, Json(body))
 }

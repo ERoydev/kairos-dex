@@ -16,8 +16,8 @@ pub mod config;
 pub mod db;
 pub mod health;
 
-pub use db::*;
 pub use config::*;
+pub use db::*;
 use health::{HealthState, health_handler};
 
 struct AppState {
@@ -33,7 +33,7 @@ async fn main() {
 
     let state = Arc::new(AppState {
         db_pool: create_pool(&config.database_url).await,
-        config
+        config,
     });
 
     // The subscriber loop (ws -> decoder -> dispatch -> handler -> DB) will call
@@ -48,11 +48,3 @@ async fn main() {
     println!("Listening on http://localhost:3000");
     axum::serve(listener, app).await.unwrap();
 }
-
-// async fn list_users(State(state): State<Arc<AppState>>) -> Json<Vec<User>> {
-//     let users = sqlx::query_as!(User, "SELECT * FROM users")
-//         .fetch_all(&state.db_pool)
-//         .await
-//         .unwrap();
-//     Json(users)
-// }
