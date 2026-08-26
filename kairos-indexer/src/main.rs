@@ -15,10 +15,14 @@ use sea_orm::DatabaseConnection;
 pub mod config;
 pub mod db;
 pub mod health;
+pub mod parser;
+pub mod stream;
 
 pub use config::*;
 pub use db::*;
 use health::{HealthState, health_handler};
+pub use parser::*;
+pub use stream::*;
 
 struct AppState {
     pub db_pool: DatabaseConnection,
@@ -46,5 +50,11 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Listening on http://localhost:3000");
+
+    tokio::spawn(async move {
+        let program_id = state.config.program_id.to_string();
+        subscribe(&state.config.rpc_ws_url, &program_id).await;
+    });
+
     axum::serve(listener, app).await.unwrap();
 }
