@@ -19,7 +19,13 @@ impl Config {
         Config {
             rpc_ws_url: std::env::var("HELIUS_WS_URL").expect("missing HELIUS_WS_URL"),
             program_id,
-            database_url: std::env::var("DATABASE_URL").expect("missing DATABASE_URL")
+            database_url: std::env::var("DATABASE_URL").expect("missing DATABASE_URL"),
         }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
     }
 }
