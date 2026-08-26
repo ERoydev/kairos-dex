@@ -9,8 +9,8 @@
 
 use std::sync::Arc;
 
-use axum::{Json, Router, extract::State, routing::get};
-use sqlx::{PgPool};
+use axum::{Router, routing::get};
+use sea_orm::DatabaseConnection;
 
 pub mod config;
 pub mod db;
@@ -19,12 +19,14 @@ pub use db::*;
 pub use config::*;
 
 struct AppState {
-    pub db_pool: PgPool,
+    pub db_pool: DatabaseConnection,
     pub config: Config,
 }
 
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().ok();
+
     let app = Router::new().route("/", get(|| async { "Hello, World!" }));
     let config = Config::default();
 
