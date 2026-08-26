@@ -14,9 +14,11 @@ use sea_orm::DatabaseConnection;
 
 pub mod config;
 pub mod db;
+pub mod health;
 
 pub use db::*;
 pub use config::*;
+use health::{HealthState, health_handler};
 
 struct AppState {
     pub db_pool: DatabaseConnection,
@@ -27,7 +29,6 @@ struct AppState {
 async fn main() {
     dotenv::dotenv().ok();
 
-    let app = Router::new().route("/", get(|| async { "Hello, World!" }));
     let config = Config::default();
 
     let state = Arc::new(AppState {
@@ -35,10 +36,13 @@ async fn main() {
         config
     });
 
-    // let app = Router::new()
-    //     .route("/users", get(list_users))
-    //     .with_state(state);
+    // The subscriber loop (ws -> decoder -> dispatch -> handler -> DB) will call
+    // health_state.mark_connected()/mark_disconnected()/mark_event_processed() once built.
+    let health_state = Arc::new(HealthState::new());
 
+    let app = Router::new()
+        .route("/health", get(health_handler))
+        .with_state(health_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Listening on http://localhost:3000");
