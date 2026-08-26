@@ -43,3 +43,5 @@ cargo run
 
 - `kairos-api` — reads from the same Postgres DB
 - `kairos-perp-program` / `kairos-lp-pool-program` — source of the events
+
+- `kairos-postgre` - A docker container i have locally for now, start it then connect to it with Dbeaver to inspect data. It also have persistent data with docker volumes.
