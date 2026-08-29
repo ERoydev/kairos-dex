@@ -3,3 +3,6 @@ pub use entities::*;
 
 pub mod pools;
 pub use pools::*;
+
+pub mod queries;
+pub use queries::*;
