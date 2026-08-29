@@ -40,21 +40,18 @@ async fn main() {
         config,
     });
 
-    // The subscriber loop (ws -> decoder -> dispatch -> handler -> DB) will call
-    // health_state.mark_connected()/mark_disconnected()/mark_event_processed() once built.
     let health_state = Arc::new(HealthState::new());
 
     let app = Router::new()
         .route("/health", get(health_handler))
-        .with_state(health_state);
+        .with_state(health_state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Listening on http://localhost:3000");
 
-    tokio::spawn(async move {
-        let program_id = state.config.program_id.to_string();
-        subscribe(&state.config.rpc_ws_url, &program_id).await;
-    });
+    Subscriber::new(&state.config.rpc_ws_url, state.config.program_id.to_string())
+        .with_health_state(health_state)
+        .spawn();
 
     axum::serve(listener, app).await.unwrap();
 }
