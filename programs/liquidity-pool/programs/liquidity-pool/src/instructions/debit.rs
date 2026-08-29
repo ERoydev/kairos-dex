@@ -1,5 +1,6 @@
 use crate::constants::{LIQUIDITY_POOL_SEED, USDC_VAULT_SEED};
 use crate::error::ErrorCode;
+use crate::events::Debited;
 use crate::state::pool::Pool;
 #[cfg(feature = "dev")]
 use crate::DEFAULT_DECIMALS;
@@ -49,6 +50,12 @@ pub fn _debit(ctx: Context<Debit>, amount: u64) -> Result<()> {
 
     let pool = &mut ctx.accounts.pool;
     pool.total_assets -= amount;
+
+    emit!(Debited {
+        pool: pool.key(),
+        destination: ctx.accounts.destination.key(),
+        usdc_amount: amount,
+    });
 
     Ok(())
 }
