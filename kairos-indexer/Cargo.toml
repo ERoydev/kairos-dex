@@ -15,3 +15,8 @@ dotenv = "0.15.0"
 tokio-tungstenite = { version="0.30.0", features = ["native-tls"] }
 futures-util = "0.3.34"
 solana-sdk = "4.0.1"
+borsh = { version = "1", features = ["derive"] }
+base64 = "0.22"
+
+[build-dependencies]
+serde_json = "1"
