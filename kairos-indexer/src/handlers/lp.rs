@@ -59,11 +59,19 @@ pub async fn withdrawn(
 /// drawing from the vault), not LP provider actions — `lp_events` only models 'deposit' |
 /// 'withdraw' per its schema. We still refresh `lp_pool`'s totals since these do move
 /// `total_assets`; there's just no per-provider row to write for them.
-pub async fn credited(db: &DatabaseConnection, rpc: Option<&RpcClient>, e: Credited) -> Result<(), DbErr> {
+pub async fn credited(
+    db: &DatabaseConnection,
+    rpc: Option<&RpcClient>,
+    e: Credited,
+) -> Result<(), DbErr> {
     sync_pool(db, rpc, &e.pool, "credited").await
 }
 
-pub async fn debited(db: &DatabaseConnection, rpc: Option<&RpcClient>, e: Debited) -> Result<(), DbErr> {
+pub async fn debited(
+    db: &DatabaseConnection,
+    rpc: Option<&RpcClient>,
+    e: Debited,
+) -> Result<(), DbErr> {
     sync_pool(db, rpc, &e.pool, "debited").await
 }
 

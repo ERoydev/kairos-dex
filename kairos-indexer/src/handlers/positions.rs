@@ -81,12 +81,26 @@ pub async fn position_closed(
 
     // Pull side/owner/notional from our own `positions` row rather than guessing — it's the
     // one place that data exists once a position has gone through `position_opened` above.
-    let (owner, market, side, notional) = queries::find_position(db, &position_pubkey)
-        .await?
-        .map(|p| (p.owner, p.market, p.side, p.notional))
-        .unwrap_or_else(|| (e.trader.to_string(), e.market.to_string(), "unknown".to_string(), 0));
+    // Reuse the fetched row for `close_position` too instead of re-querying it.
+    let existing = queries::find_position(db, &position_pubkey).await?;
+    let (owner, market, side, notional) = match &existing {
+        Some(p) => (
+            p.owner.clone(),
+            p.market.clone(),
+            p.side.clone(),
+            p.notional,
+        ),
+        None => (
+            e.trader.to_string(),
+            e.market.to_string(),
+            "unknown".to_string(),
+            0,
+        ),
+    };
 
-    queries::close_position(db, &position_pubkey).await?;
+    if let Some(existing) = existing {
+        queries::close_position(db, existing).await?;
+    }
 
     queries::insert_position_event(
         db,
@@ -118,12 +132,25 @@ pub async fn position_liquidated(
 ) -> Result<(), DbErr> {
     let position_pubkey = e.position.to_string();
 
-    let (owner, market, side, notional) = queries::find_position(db, &position_pubkey)
-        .await?
-        .map(|p| (p.owner, p.market, p.side, p.notional))
-        .unwrap_or_else(|| (e.trader.to_string(), e.market.to_string(), "unknown".to_string(), 0));
+    let existing = queries::find_position(db, &position_pubkey).await?;
+    let (owner, market, side, notional) = match &existing {
+        Some(p) => (
+            p.owner.clone(),
+            p.market.clone(),
+            p.side.clone(),
+            p.notional,
+        ),
+        None => (
+            e.trader.to_string(),
+            e.market.to_string(),
+            "unknown".to_string(),
+            0,
+        ),
+    };
 
-    queries::close_position(db, &position_pubkey).await?;
+    if let Some(existing) = existing {
+        queries::close_position(db, existing).await?;
+    }
 
     queries::insert_position_event(
         db,

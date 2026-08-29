@@ -17,16 +17,28 @@ use crate::rpc::RpcClient;
 /// changes) are acknowledged and dropped. `rpc`, when set, lets handlers enrich an event with
 /// on-chain account state it doesn't itself carry (e.g. a position's side/collateral/notional).
 pub async fn dispatch(decoded: DecodedEvent, db: &DatabaseConnection, rpc: Option<&RpcClient>) {
-    let DecodedEvent { event, signature, slot } = decoded;
+    let DecodedEvent {
+        event,
+        signature,
+        slot,
+    } = decoded;
 
     let result = match event {
-        PerpEvent::PositionOpened(e) => positions::position_opened(db, rpc, e, &signature, slot).await,
+        PerpEvent::PositionOpened(e) => {
+            positions::position_opened(db, rpc, e, &signature, slot).await
+        }
         PerpEvent::PositionClosed(e) => positions::position_closed(db, e, &signature, slot).await,
-        PerpEvent::PositionLiquidated(e) => positions::position_liquidated(db, e, &signature, slot).await,
-        PerpEvent::FundingUpdated(e) => funding::funding_updated(db, rpc, e, &signature, slot).await,
+        PerpEvent::PositionLiquidated(e) => {
+            positions::position_liquidated(db, e, &signature, slot).await
+        }
+        PerpEvent::FundingUpdated(e) => {
+            funding::funding_updated(db, rpc, e, &signature, slot).await
+        }
         PerpEvent::MarketInitialized(e) => markets::market_initialized(db, rpc, e).await,
         PerpEvent::MarketPaused(e) => markets::market_paused(db, e).await,
-        PerpEvent::CapsUpdated(_) | PerpEvent::GlobalInitialized(_) | PerpEvent::GlobalUpdated(_) => Ok(()),
+        PerpEvent::CapsUpdated(_)
+        | PerpEvent::GlobalInitialized(_)
+        | PerpEvent::GlobalUpdated(_) => Ok(()),
     };
 
     if let Err(e) = result {
@@ -35,8 +47,16 @@ pub async fn dispatch(decoded: DecodedEvent, db: &DatabaseConnection, rpc: Optio
 }
 
 /// Same as `dispatch`, for the `liquidity_pool` program's events.
-pub async fn dispatch_lp(decoded: DecodedLpEvent, db: &DatabaseConnection, rpc: Option<&RpcClient>) {
-    let DecodedLpEvent { event, signature, slot } = decoded;
+pub async fn dispatch_lp(
+    decoded: DecodedLpEvent,
+    db: &DatabaseConnection,
+    rpc: Option<&RpcClient>,
+) {
+    let DecodedLpEvent {
+        event,
+        signature,
+        slot,
+    } = decoded;
 
     let result = match event {
         LpEvent::Deposited(e) => lp::deposited(db, rpc, e, &signature, slot).await,

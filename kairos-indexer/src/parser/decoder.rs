@@ -3,9 +3,8 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use borsh::BorshDeserialize;
 
 use crate::parser::events::{
-    AnchorEvent, CapsUpdated, FundingUpdated, GlobalInitialized, GlobalUpdated,
-    MarketInitialized, MarketPaused, PerpEvent, PositionClosed, PositionLiquidated,
-    PositionOpened,
+    AnchorEvent, CapsUpdated, FundingUpdated, GlobalInitialized, GlobalUpdated, MarketInitialized,
+    MarketPaused, PerpEvent, PositionClosed, PositionLiquidated, PositionOpened,
 };
 use crate::parser::notification::{LogsNotification, PROGRAM_DATA_PREFIX};
 

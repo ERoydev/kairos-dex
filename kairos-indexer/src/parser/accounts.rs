@@ -32,7 +32,10 @@ impl std::fmt::Display for AccountDecodeError {
         match self {
             Self::TooShort => write!(f, "account data shorter than an 8-byte discriminator"),
             Self::DiscriminatorMismatch { expected, actual } => {
-                write!(f, "discriminator mismatch: expected {expected:?}, got {actual:?}")
+                write!(
+                    f,
+                    "discriminator mismatch: expected {expected:?}, got {actual:?}"
+                )
             }
             Self::Borsh(e) => write!(f, "borsh decode failed: {e}"),
         }

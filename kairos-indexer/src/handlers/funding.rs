@@ -16,10 +16,11 @@ pub async fn funding_updated(
     let market = e.market.to_string();
 
     // oi_long/oi_short aren't in this event, but they're fields on the SynteticMarket account.
-    let (oi_long, oi_short) = super::fetch_account::<SynteticMarket>(rpc, &e.market, "funding_updated")
-        .await
-        .map(|account| (account.oi_long as i64, account.oi_short as i64))
-        .unwrap_or((0, 0));
+    let (oi_long, oi_short) =
+        super::fetch_account::<SynteticMarket>(rpc, &e.market, "funding_updated")
+            .await
+            .map(|account| (account.oi_long as i64, account.oi_short as i64))
+            .unwrap_or((0, 0));
 
     queries::insert_funding_update(
         db,
@@ -36,5 +37,11 @@ pub async fn funding_updated(
     )
     .await?;
 
-    queries::update_market_funding(db, &market, e.cumulative_funding_index_bps, e.last_funding_time).await
+    queries::update_market_funding(
+        db,
+        &market,
+        e.cumulative_funding_index_bps,
+        e.last_funding_time,
+    )
+    .await
 }

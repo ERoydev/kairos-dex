@@ -52,14 +52,21 @@ fn process_idl(
         )
     });
 
-    let idl: Value = serde_json::from_str(&idl_raw).unwrap_or_else(|e| panic!("IDL at `{idl_path}` is not valid JSON: {e}"));
+    let idl: Value = serde_json::from_str(&idl_raw)
+        .unwrap_or_else(|e| panic!("IDL at `{idl_path}` is not valid JSON: {e}"));
     let program_name = idl["metadata"]["name"].as_str().unwrap_or("unknown");
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    fs::write(out_dir.join(events_file), generate_events(&idl, program_name, event_enum_name))
-        .unwrap_or_else(|e| panic!("Failed to write {events_file}: {e}"));
-    fs::write(out_dir.join(accounts_file), generate_accounts(&idl, program_name))
-        .unwrap_or_else(|e| panic!("Failed to write {accounts_file}: {e}"));
+    fs::write(
+        out_dir.join(events_file),
+        generate_events(&idl, program_name, event_enum_name),
+    )
+    .unwrap_or_else(|e| panic!("Failed to write {events_file}: {e}"));
+    fs::write(
+        out_dir.join(accounts_file),
+        generate_accounts(&idl, program_name),
+    )
+    .unwrap_or_else(|e| panic!("Failed to write {accounts_file}: {e}"));
 }
 
 fn generate_events(idl: &Value, program_name: &str, enum_name: &str) -> String {
@@ -67,7 +74,9 @@ fn generate_events(idl: &Value, program_name: &str, enum_name: &str) -> String {
     let events = idl["events"].as_array().cloned().unwrap_or_default();
     assert!(!events.is_empty(), "{program_name} IDL has no events");
 
-    let mut out = format!("// @generated from the {program_name} program IDL by build.rs — do not edit by hand.\n\n");
+    let mut out = format!(
+        "// @generated from the {program_name} program IDL by build.rs — do not edit by hand.\n\n"
+    );
     let mut emitted = BTreeSet::new();
     let mut variants = String::new();
 
@@ -80,7 +89,9 @@ fn generate_events(idl: &Value, program_name: &str, enum_name: &str) -> String {
     out.push_str(&format!(
         "/// Every event the `{program_name}` program emits, decoded from a `Program data:` log line.\n"
     ));
-    out.push_str(&format!("#[derive(Debug, Clone, PartialEq)]\npub enum {enum_name} {{\n"));
+    out.push_str(&format!(
+        "#[derive(Debug, Clone, PartialEq)]\npub enum {enum_name} {{\n"
+    ));
     out.push_str(&variants);
     out.push_str("}\n");
 
@@ -94,12 +105,21 @@ fn generate_accounts(idl: &Value, program_name: &str) -> String {
     let accounts = idl["accounts"].as_array().cloned().unwrap_or_default();
     assert!(!accounts.is_empty(), "{program_name} IDL has no accounts");
 
-    let mut out = format!("// @generated from the {program_name} program IDL by build.rs — do not edit by hand.\n\n");
+    let mut out = format!(
+        "// @generated from the {program_name} program IDL by build.rs — do not edit by hand.\n\n"
+    );
     let mut emitted = BTreeSet::new();
 
     for account in &accounts {
         let name = account["name"].as_str().expect("account missing `name`");
-        emit_named_with_discriminator(&mut out, &mut emitted, &types, account, name, "AnchorAccount");
+        emit_named_with_discriminator(
+            &mut out,
+            &mut emitted,
+            &types,
+            account,
+            name,
+            "AnchorAccount",
+        );
     }
 
     out
@@ -138,7 +158,10 @@ fn find_type<'a>(types: &'a [Value], name: &str) -> Option<&'a Value> {
 /// first. Structs and enums share the "have we emitted this name already" dedup set since IDL
 /// type names are unique across both kinds.
 fn emit_type(out: &mut String, emitted: &mut BTreeSet<String>, types: &[Value], ty: &Value) {
-    let name = ty["name"].as_str().expect("type missing `name`").to_string();
+    let name = ty["name"]
+        .as_str()
+        .expect("type missing `name`")
+        .to_string();
     if !emitted.insert(name.clone()) {
         return;
     }
@@ -150,7 +173,13 @@ fn emit_type(out: &mut String, emitted: &mut BTreeSet<String>, types: &[Value], 
     }
 }
 
-fn emit_struct(out: &mut String, emitted: &mut BTreeSet<String>, types: &[Value], name: &str, ty: &Value) {
+fn emit_struct(
+    out: &mut String,
+    emitted: &mut BTreeSet<String>,
+    types: &[Value],
+    name: &str,
+    ty: &Value,
+) {
     let fields = ty["type"]["fields"]
         .as_array()
         .cloned()
@@ -165,7 +194,10 @@ fn emit_struct(out: &mut String, emitted: &mut BTreeSet<String>, types: &[Value]
     out.push_str(" {\n");
     for field in &fields {
         let field_name = field["name"].as_str().expect("field missing `name`");
-        out.push_str(&format!("    pub {field_name}: {},\n", rust_type(&field["type"])));
+        out.push_str(&format!(
+            "    pub {field_name}: {},\n",
+            rust_type(&field["type"])
+        ));
     }
     out.push_str("}\n\n");
 }
@@ -192,7 +224,12 @@ fn emit_enum(out: &mut String, name: &str, ty: &Value) {
 
 /// Recursively emits definitions for any `defined` (named) type a field depends on, before the
 /// field's own containing type is emitted.
-fn emit_dependencies(out: &mut String, emitted: &mut BTreeSet<String>, types: &[Value], field_type: &Value) {
+fn emit_dependencies(
+    out: &mut String,
+    emitted: &mut BTreeSet<String>,
+    types: &[Value],
+    field_type: &Value,
+) {
     if let Some(defined) = field_type.get("defined") {
         let name = defined["name"].as_str().expect("`defined` missing `name`");
         let ty = find_type(types, name)
@@ -210,15 +247,17 @@ fn rust_type(field_type: &Value) -> String {
         return match primitive {
             "pubkey" => "Pubkey".to_string(),
             "string" => "String".to_string(),
-            "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64" | "i128" | "bool" => {
-                primitive.to_string()
-            }
+            "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64" | "i128"
+            | "bool" => primitive.to_string(),
             other => panic!("unsupported IDL primitive type: {other}"),
         };
     }
 
     if let Some(defined) = field_type.get("defined") {
-        return defined["name"].as_str().expect("`defined` missing `name`").to_string();
+        return defined["name"]
+            .as_str()
+            .expect("`defined` missing `name`")
+            .to_string();
     }
 
     if let Some(inner) = field_type.get("option") {

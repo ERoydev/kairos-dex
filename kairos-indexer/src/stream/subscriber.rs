@@ -36,7 +36,11 @@ pub struct Subscriber {
 }
 
 impl Subscriber {
-    pub fn new(rpc_ws_url: impl Into<String>, program_id: impl Into<String>, kind: ProgramKind) -> Self {
+    pub fn new(
+        rpc_ws_url: impl Into<String>,
+        program_id: impl Into<String>,
+        kind: ProgramKind,
+    ) -> Self {
         Self {
             rpc_ws_url: rpc_ws_url.into(),
             program_id: program_id.into(),

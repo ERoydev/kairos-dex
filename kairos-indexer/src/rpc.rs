@@ -8,6 +8,11 @@ use crate::parser::accounts::{AccountDecodeError, AnchorAccount, decode_account}
 
 /// Minimal Solana JSON-RPC HTTP client — just the one call the indexer needs
 /// (`getAccountInfo`) to enrich events with on-chain account state they don't carry.
+///
+/// Cheap to `Clone`: `reqwest::Client` pools connections internally behind an `Arc`, so cloning
+/// this (e.g. to share across multiple `Subscriber`s hitting the same RPC URL) reuses the pool
+/// instead of opening a second one.
+#[derive(Clone)]
 pub struct RpcClient {
     http: reqwest::Client,
     url: String,
@@ -23,7 +28,10 @@ impl RpcClient {
 
     /// Fetches an account and decodes it as `T`. Returns `Ok(None)` if the account doesn't
     /// exist on-chain (e.g. it was already closed by the time we asked).
-    pub async fn get_account<T: AnchorAccount>(&self, pubkey: &Pubkey) -> Result<Option<T>, RpcError> {
+    pub async fn get_account<T: AnchorAccount>(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<Option<T>, RpcError> {
         let Some(data) = self.get_account_data(pubkey).await? else {
             return Ok(None);
         };
@@ -39,8 +47,14 @@ impl RpcClient {
             "params": [pubkey.to_string(), { "encoding": "base64" }]
         });
 
-        let response: GetAccountInfoResponse =
-            self.http.post(&self.url).json(&body).send().await?.json().await?;
+        let response: GetAccountInfoResponse = self
+            .http
+            .post(&self.url)
+            .json(&body)
+            .send()
+            .await?
+            .json()
+            .await?;
 
         let Some(value) = response.result.value else {
             return Ok(None);

@@ -1,7 +1,11 @@
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, Set,
+};
 
-use crate::db::entities::{funding_updates, lp_events, lp_pool, markets, position_events, positions};
+use crate::db::entities::{
+    funding_updates, lp_events, lp_pool, markets, position_events, positions,
+};
 
 pub async fn find_position(
     db: &DatabaseConnection,
@@ -13,19 +17,23 @@ pub async fn find_position(
         .await
 }
 
-pub async fn insert_position(db: &DatabaseConnection, model: positions::ActiveModel) -> Result<(), DbErr> {
+pub async fn insert_position(
+    db: &DatabaseConnection,
+    model: positions::ActiveModel,
+) -> Result<(), DbErr> {
     model.insert(db).await?;
     Ok(())
 }
 
-/// Marks a position closed. No-op if the position isn't tracked (e.g. it was opened before
-/// this indexer started running).
-pub async fn close_position(db: &DatabaseConnection, position_pubkey: &str) -> Result<(), DbErr> {
-    if let Some(existing) = find_position(db, position_pubkey).await? {
-        let mut model: positions::ActiveModel = existing.into();
-        model.closed_at = Set(Some(Utc::now().into()));
-        model.update(db).await?;
-    }
+/// Marks an already-fetched position closed. Takes the row itself (rather than a pubkey and
+/// re-querying) since callers need the pre-close row anyway to build the `position_events` entry.
+pub async fn close_position(
+    db: &DatabaseConnection,
+    existing: positions::Model,
+) -> Result<(), DbErr> {
+    let mut model: positions::ActiveModel = existing.into();
+    model.closed_at = Set(Some(Utc::now().into()));
+    model.update(db).await?;
     Ok(())
 }
 
@@ -45,7 +53,10 @@ pub async fn insert_funding_update(
     Ok(())
 }
 
-pub async fn insert_market(db: &DatabaseConnection, model: markets::ActiveModel) -> Result<(), DbErr> {
+pub async fn insert_market(
+    db: &DatabaseConnection,
+    model: markets::ActiveModel,
+) -> Result<(), DbErr> {
     model.insert(db).await?;
     Ok(())
 }
@@ -92,12 +103,18 @@ pub async fn update_market_funding(
     Ok(())
 }
 
-pub async fn insert_lp_event(db: &DatabaseConnection, model: lp_events::ActiveModel) -> Result<(), DbErr> {
+pub async fn insert_lp_event(
+    db: &DatabaseConnection,
+    model: lp_events::ActiveModel,
+) -> Result<(), DbErr> {
     model.insert(db).await?;
     Ok(())
 }
 
-async fn find_lp_pool(db: &DatabaseConnection, pool_pubkey: &str) -> Result<Option<lp_pool::Model>, DbErr> {
+async fn find_lp_pool(
+    db: &DatabaseConnection,
+    pool_pubkey: &str,
+) -> Result<Option<lp_pool::Model>, DbErr> {
     lp_pool::Entity::find()
         .filter(lp_pool::Column::PoolPubkey.eq(pool_pubkey))
         .one(db)

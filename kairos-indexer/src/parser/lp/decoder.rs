@@ -91,3 +91,62 @@ fn decode_event(encoded: &str) -> Result<LpEvent, DecodeError> {
 
     Err(DecodeError::UnknownDiscriminator(discriminator))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Builds a `Program data:` log line the same way Anchor's `emit!` does: an 8-byte
+    /// discriminator followed by the borsh-encoded fields, base64'd. We don't have a real
+    /// captured `Deposited` log (never run against devnet), so this hand-encodes one from the
+    /// struct's known field layout (pool: Pubkey, provider: Pubkey, usdc_amount: u64,
+    /// shares_minted: u64) instead.
+    fn deposited_log(usdc_amount: u64, shares_minted: u64) -> String {
+        let mut payload = Deposited::DISCRIMINATOR.to_vec();
+        payload.extend_from_slice(&[1u8; 32]); // pool
+        payload.extend_from_slice(&[2u8; 32]); // provider
+        payload.extend_from_slice(&usdc_amount.to_le_bytes());
+        payload.extend_from_slice(&shares_minted.to_le_bytes());
+        format!("Program data: {}", BASE64.encode(payload))
+    }
+
+    #[test]
+    fn decodes_deposited_event() {
+        let log = deposited_log(1_000_000, 500_000);
+        let raw = format!(
+            r#"{{
+                "jsonrpc": "2.0",
+                "method": "logsNotification",
+                "params": {{
+                    "subscription": 1,
+                    "result": {{
+                        "context": {{ "slot": 42 }},
+                        "value": {{
+                            "signature": "sig",
+                            "err": null,
+                            "logs": ["Program log: Instruction: Deposit", "{log}"]
+                        }}
+                    }}
+                }}
+            }}"#
+        );
+
+        let events = parse_message(&raw);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].slot, 42);
+        assert_eq!(events[0].signature, "sig");
+
+        match &events[0].event {
+            LpEvent::Deposited(e) => {
+                assert_eq!(e.usdc_amount, 1_000_000);
+                assert_eq!(e.shares_minted, 500_000);
+            }
+            other => panic!("expected Deposited, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ignores_unrelated_messages() {
+        assert!(parse_message(r#"{"jsonrpc":"2.0","result":1,"id":1}"#).is_empty());
+    }
+}
