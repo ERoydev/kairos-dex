@@ -35,3 +35,10 @@ signed and broadcast:
 
 cd programs/perp
 anchor test
+
+# Devnet deployment
+
+```bash
+anchor build
+surfpool run deployment --env devnet
+```

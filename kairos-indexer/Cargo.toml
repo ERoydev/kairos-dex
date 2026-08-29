@@ -5,10 +5,13 @@ edition = "2024"
 
 [dependencies]
 axum = "0.8"
-solana-sdk = "4.1.0"
 tokio = { version = "1", features = ["full"] }
 sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
 sea-orm-migration = "1.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dotenv = "0.15.0"
+# solana-sdk = "4.1.0"
+tokio-tungstenite = { version="0.30.0", features = ["native-tls"] }
+futures-util = "0.3.34"
+solana-sdk = "4.0.1"

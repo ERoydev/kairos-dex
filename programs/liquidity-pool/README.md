@@ -20,3 +20,11 @@ All of these result in USDC flowing into the pool → credit.
 2. debit is the mirror — any time the trader makes money, the pool pays them out.
 
 The perp program is the one that knows the PnL, so it decides which to call and with what amount. The LP pool just blindly accepts or sends USDC when the authorized caller (perp program) tells it to.
+
+
+# Deploy on Devnet
+
+```bash
+anchor build
+surfpool run deployment --env devnet
+```

@@ -14,9 +14,15 @@ use sea_orm::DatabaseConnection;
 
 pub mod config;
 pub mod db;
+pub mod health;
+pub mod parser;
+pub mod stream;
 
-pub use db::*;
 pub use config::*;
+pub use db::*;
+use health::{HealthState, health_handler};
+pub use parser::*;
+pub use stream::*;
 
 struct AppState {
     pub db_pool: DatabaseConnection,
@@ -27,28 +33,25 @@ struct AppState {
 async fn main() {
     dotenv::dotenv().ok();
 
-    let app = Router::new().route("/", get(|| async { "Hello, World!" }));
     let config = Config::default();
 
     let state = Arc::new(AppState {
         db_pool: create_pool(&config.database_url).await,
-        config
+        config,
     });
 
-    // let app = Router::new()
-    //     .route("/users", get(list_users))
-    //     .with_state(state);
+    let health_state = Arc::new(HealthState::new());
 
+    let app = Router::new()
+        .route("/health", get(health_handler))
+        .with_state(health_state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Listening on http://localhost:3000");
+
+    Subscriber::new(&state.config.rpc_ws_url, state.config.program_id.to_string())
+        .with_health_state(health_state)
+        .spawn();
+
     axum::serve(listener, app).await.unwrap();
 }
-
-// async fn list_users(State(state): State<Arc<AppState>>) -> Json<Vec<User>> {
-//     let users = sqlx::query_as!(User, "SELECT * FROM users")
-//         .fetch_all(&state.db_pool)
-//         .await
-//         .unwrap();
-//     Json(users)
-// }
