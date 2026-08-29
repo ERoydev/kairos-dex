@@ -1,5 +1,6 @@
 use crate::constants::{LIQUIDITY_POOL_SEED, LP_MINT_SEED, USDC_VAULT_SEED};
 use crate::error::ErrorCode;
+use crate::events::Withdrawn;
 use crate::state::pool::Pool;
 #[cfg(feature = "dev")]
 use crate::DEFAULT_DECIMALS;
@@ -61,6 +62,13 @@ pub fn _withdraw(ctx: Context<Withdraw>, lp_amount: u64) -> Result<()> {
     let pool = &mut ctx.accounts.pool;
     pool.total_shares -= lp_amount;
     pool.total_assets -= usdc_to_return;
+
+    emit!(Withdrawn {
+        pool: pool.key(),
+        provider: provider.key(),
+        usdc_amount: usdc_to_return,
+        shares_burned: lp_amount,
+    });
 
     Ok(())
 }

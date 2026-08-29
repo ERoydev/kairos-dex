@@ -10,12 +10,15 @@
 use std::sync::Arc;
 
 use axum::{Router, routing::get};
+use migration::{Migrator, MigratorTrait};
 use sea_orm::DatabaseConnection;
 
 pub mod config;
 pub mod db;
+pub mod handlers;
 pub mod health;
 pub mod parser;
+pub mod rpc;
 pub mod stream;
 
 pub use config::*;
@@ -35,10 +38,12 @@ async fn main() {
 
     let config = Config::default();
 
-    let state = Arc::new(AppState {
-        db_pool: create_pool(&config.database_url).await,
-        config,
-    });
+    let db_pool = create_pool(&config.database_url).await;
+    Migrator::up(&db_pool, None)
+        .await
+        .expect("Failed to run pending migrations");
+
+    let state = Arc::new(AppState { db_pool, config });
 
     let health_state = Arc::new(HealthState::new());
 
@@ -49,9 +54,29 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Listening on http://localhost:3000");
 
-    Subscriber::new(&state.config.rpc_ws_url, state.config.program_id.to_string())
-        .with_health_state(health_state)
-        .spawn();
+    // Both subscribers hit the same RPC URL — share one client so they share its connection
+    // pool instead of each opening their own.
+    let rpc_client = rpc::RpcClient::new(&state.config.rpc_http_url);
+
+    Subscriber::new(
+        &state.config.rpc_ws_url,
+        state.config.program_id.to_string(),
+        ProgramKind::Perp,
+    )
+    .with_health_state(health_state.clone())
+    .with_db(state.db_pool.clone())
+    .with_rpc(rpc_client.clone())
+    .spawn();
+
+    Subscriber::new(
+        &state.config.rpc_ws_url,
+        state.config.lp_pool_program_id.to_string(),
+        ProgramKind::LpPool,
+    )
+    .with_health_state(health_state)
+    .with_db(state.db_pool.clone())
+    .with_rpc(rpc_client)
+    .spawn();
 
     axum::serve(listener, app).await.unwrap();
 }

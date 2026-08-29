@@ -1,46 +1,33 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use borsh::BorshDeserialize;
-use serde::Deserialize;
 
 use crate::parser::events::{
-    AnchorEvent, CapsUpdated, FundingUpdated, GlobalInitialized, GlobalUpdated,
-    MarketInitialized, MarketPaused, PerpEvent, PositionClosed, PositionLiquidated,
-    PositionOpened,
+    AnchorEvent, CapsUpdated, FundingUpdated, GlobalInitialized, GlobalUpdated, MarketInitialized,
+    MarketPaused, PerpEvent, PositionClosed, PositionLiquidated, PositionOpened,
 };
+use crate::parser::notification::{LogsNotification, PROGRAM_DATA_PREFIX};
 
-const PROGRAM_DATA_PREFIX: &str = "Program data: ";
-
-#[derive(Debug, Deserialize)]
-struct LogsNotification {
-    params: NotificationParams,
-}
-
-#[derive(Debug, Deserialize)]
-struct NotificationParams {
-    result: NotificationResult,
-}
-
-#[derive(Debug, Deserialize)]
-struct NotificationResult {
-    value: NotificationValue,
-}
-
-#[derive(Debug, Deserialize)]
-struct NotificationValue {
-    signature: String,
-    logs: Vec<String>,
+/// A decoded event plus the transaction context it came from — the parts of a
+/// `logsNotification` (signature, slot) the DB rows need but the Anchor event itself doesn't carry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecodedEvent {
+    pub event: PerpEvent,
+    pub signature: String,
+    pub slot: u64,
 }
 
 /// Parses a raw `logsNotification` websocket message into every `perp` program event it
 /// carries, in log order. Unrelated messages (subscription acks, other programs' logs,
 /// unrecognized events) yield an empty vec rather than an error.
-pub fn parse_message(raw: &str) -> Vec<PerpEvent> {
+pub fn parse_message(raw: &str) -> Vec<DecodedEvent> {
     let Ok(notification) = serde_json::from_str::<LogsNotification>(raw) else {
         return Vec::new();
     };
 
-    let signature = &notification.params.result.value.signature;
+    let signature = notification.params.result.value.signature;
+    let slot = notification.params.result.context.slot;
+
     notification
         .params
         .result
@@ -49,7 +36,11 @@ pub fn parse_message(raw: &str) -> Vec<PerpEvent> {
         .iter()
         .filter_map(|log| log.strip_prefix(PROGRAM_DATA_PREFIX))
         .filter_map(|encoded| match decode_event(encoded) {
-            Ok(event) => Some(event),
+            Ok(event) => Some(DecodedEvent {
+                event,
+                signature: signature.clone(),
+                slot,
+            }),
             Err(e) => {
                 eprintln!("Failed to decode event in tx {signature}: {e}");
                 None
@@ -139,7 +130,12 @@ mod tests {
 
         let events = parse_message(raw);
         assert_eq!(events.len(), 1);
-        assert!(matches!(events[0], PerpEvent::GlobalUpdated(_)));
+        assert!(matches!(events[0].event, PerpEvent::GlobalUpdated(_)));
+        assert_eq!(events[0].slot, 489835284);
+        assert_eq!(
+            events[0].signature,
+            "teB3nY2KBnKAPTcJhRdxrvcHQ7k2JAJdzbU9hUp9BqL2MGiaNzAGw9NbE6TZY7zJq2FCf8KeVT7hMWox9RZCiv9"
+        );
     }
 
     #[test]

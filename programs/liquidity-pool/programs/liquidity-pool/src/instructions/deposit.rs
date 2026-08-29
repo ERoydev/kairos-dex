@@ -1,4 +1,5 @@
 use crate::constants::{LIQUIDITY_POOL_SEED, LP_MINT_SEED, USDC_VAULT_SEED};
+use crate::events::Deposited;
 use crate::state::pool::Pool;
 #[cfg(feature = "dev")]
 use crate::DEFAULT_DECIMALS;
@@ -58,6 +59,13 @@ pub fn _deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     let pool = &mut ctx.accounts.pool;
     pool.total_assets += amount;
     pool.total_shares += amount_to_mint;
+
+    emit!(Deposited {
+        pool: pool.key(),
+        provider: provider.key(),
+        usdc_amount: amount,
+        shares_minted: amount_to_mint,
+    });
 
     Ok(())
 }
