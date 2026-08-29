@@ -7,6 +7,7 @@ use tokio::time::{interval, sleep};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use crate::health::HealthState;
+use crate::parser::parse_message;
 
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
@@ -94,9 +95,11 @@ impl Subscriber {
 
                     match message? {
                         Message::Text(text) => {
-                            println!("Received a message: {text}");
-                            if let Some(health_state) = &self.health_state {
-                                health_state.mark_event_processed();
+                            for event in parse_message(&text) {
+                                println!("Decoded event: {event:?}");
+                                if let Some(health_state) = &self.health_state {
+                                    health_state.mark_event_processed();
+                                }
                             }
                         }
                         Message::Ping(payload) => write.send(Message::Pong(payload)).await?,
