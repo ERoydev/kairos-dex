@@ -17,11 +17,26 @@ pub async fn find_position(
         .await
 }
 
-pub async fn insert_position(
+/// Inserts a fresh row, or resets an existing one back to "open" if this pubkey was already
+/// tracked — the program closes a position's account on `close_position`, so the same PDA can
+/// legitimately be reused by a later, unrelated `open_position`. A blind INSERT would collide
+/// with `position_pubkey`'s unique constraint the second time that address gets reopened.
+pub async fn upsert_position(
     db: &DatabaseConnection,
-    model: positions::ActiveModel,
+    position_pubkey: &str,
+    mut model: positions::ActiveModel,
 ) -> Result<(), DbErr> {
-    model.insert(db).await?;
+    match find_position(db, position_pubkey).await? {
+        Some(existing) => {
+            model.id = Set(existing.id);
+            model.update(db).await?;
+            println!("DB: updated positions row for {position_pubkey}");
+        }
+        None => {
+            model.insert(db).await?;
+            println!("DB: inserted positions row for {position_pubkey}");
+        }
+    }
     Ok(())
 }
 
@@ -31,9 +46,11 @@ pub async fn close_position(
     db: &DatabaseConnection,
     existing: positions::Model,
 ) -> Result<(), DbErr> {
+    let position_pubkey = existing.position_pubkey.clone();
     let mut model: positions::ActiveModel = existing.into();
     model.closed_at = Set(Some(Utc::now().into()));
     model.update(db).await?;
+    println!("DB: closed positions row for {position_pubkey}");
     Ok(())
 }
 
@@ -41,7 +58,10 @@ pub async fn insert_position_event(
     db: &DatabaseConnection,
     model: position_events::ActiveModel,
 ) -> Result<(), DbErr> {
+    let event_type = model.event_type.as_ref().clone();
+    let position_pubkey = model.position_pubkey.as_ref().clone();
     model.insert(db).await?;
+    println!("DB: inserted position_events row ({event_type}) for {position_pubkey}");
     Ok(())
 }
 
@@ -49,7 +69,9 @@ pub async fn insert_funding_update(
     db: &DatabaseConnection,
     model: funding_updates::ActiveModel,
 ) -> Result<(), DbErr> {
+    let market = model.market.as_ref().clone();
     model.insert(db).await?;
+    println!("DB: inserted funding_updates row for market {market}");
     Ok(())
 }
 
@@ -57,7 +79,9 @@ pub async fn insert_market(
     db: &DatabaseConnection,
     model: markets::ActiveModel,
 ) -> Result<(), DbErr> {
+    let market_pubkey = model.market_pubkey.as_ref().clone();
     model.insert(db).await?;
+    println!("DB: inserted markets row for {market_pubkey}");
     Ok(())
 }
 
@@ -82,6 +106,7 @@ pub async fn set_market_active(
         model.is_active = Set(is_active);
         model.updated_at = Set(Utc::now().into());
         model.update(db).await?;
+        println!("DB: updated markets row for {market_pubkey} (is_active={is_active})");
     }
     Ok(())
 }
@@ -99,6 +124,7 @@ pub async fn update_market_funding(
         model.last_funding_time = Set(last_funding_time);
         model.updated_at = Set(Utc::now().into());
         model.update(db).await?;
+        println!("DB: updated markets row for {market_pubkey} (funding)");
     }
     Ok(())
 }
@@ -107,7 +133,10 @@ pub async fn insert_lp_event(
     db: &DatabaseConnection,
     model: lp_events::ActiveModel,
 ) -> Result<(), DbErr> {
+    let event_type = model.event_type.as_ref().clone();
+    let provider = model.provider.as_ref().clone();
     model.insert(db).await?;
+    println!("DB: inserted lp_events row ({event_type}) for {provider}");
     Ok(())
 }
 
@@ -136,6 +165,7 @@ pub async fn upsert_lp_pool(
             model.total_shares = Set(total_shares);
             model.updated_at = Set(Utc::now().into());
             model.update(db).await?;
+            println!("DB: updated lp_pool row for {pool_pubkey}");
         }
         None => {
             lp_pool::ActiveModel {
@@ -146,6 +176,7 @@ pub async fn upsert_lp_pool(
             }
             .insert(db)
             .await?;
+            println!("DB: inserted lp_pool row for {pool_pubkey}");
         }
     }
     Ok(())

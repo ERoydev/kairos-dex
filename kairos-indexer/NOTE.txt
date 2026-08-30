@@ -1,0 +1,8 @@
+
+stream/subscriber.rs  →  parser/decoder.rs  →  handlers/mod.rs::dispatch()  →  handlers/*.rs  →  db/queries.rs
+   (logsSubscribe)         (raw log → Event)         (match on Event)         (per-event logic)   (DB write)
+
+1. subscriber.rs opens a WS connection to Solana RPC and yields raw logs for your program id — this runs in a loop in main.rs, not triggered by any request.
+2. decoder.rs turns each raw log into a typed Event.
+3. handlers::dispatch(event, db) matches on the Event variant and calls the matching handler (position_opened, position_closed, etc.).
+4. That handler calls the matching queries.rs function to write to the DB.

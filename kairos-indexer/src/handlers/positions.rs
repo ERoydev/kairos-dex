@@ -1,3 +1,4 @@
+use chrono::Utc;
 use sea_orm::{DatabaseConnection, DbErr, Set};
 
 use crate::db::entities::{position_events, positions};
@@ -32,8 +33,9 @@ pub async fn position_opened(
             None => ("unknown".to_string(), 0, 0),
         };
 
-    queries::insert_position(
+    queries::upsert_position(
         db,
+        &position_pubkey,
         positions::ActiveModel {
             position_pubkey: Set(position_pubkey.clone()),
             owner: Set(owner.clone()),
@@ -43,6 +45,10 @@ pub async fn position_opened(
             notional: Set(notional),
             entry_price: Set(entry_price),
             entry_funding_index: Set(e.entry_funding_index_bps),
+            // Explicit rather than relying on the column default — the position could be
+            // *reopening* at a pubkey that already has an old (closed) row, in which case a
+            // default that only applies on INSERT wouldn't touch this on the UPDATE path.
+            opened_at: Set(Utc::now().into()),
             closed_at: Set(None),
             ..Default::default()
         },

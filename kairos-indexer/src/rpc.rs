@@ -44,7 +44,7 @@ impl RpcClient {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "getAccountInfo",
-            "params": [pubkey.to_string(), { "encoding": "base64" }]
+            "params": [pubkey.to_string(), { "encoding": "base64", "commitment": "confirmed" }]
         });
 
         let response: GetAccountInfoResponse = self
