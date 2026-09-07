@@ -5,7 +5,7 @@ use crate::db::entities::{position_events, positions};
 use crate::db::queries;
 use crate::parser::accounts::Position as PositionAccount;
 use crate::parser::events::{PositionClosed, PositionLiquidated, PositionOpened};
-use crate::rpc::RpcClient;
+use rpc::RpcClient;
 
 pub async fn position_opened(
     db: &DatabaseConnection,

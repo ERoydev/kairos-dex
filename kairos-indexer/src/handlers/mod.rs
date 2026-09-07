@@ -6,12 +6,12 @@ pub mod positions;
 use sea_orm::DatabaseConnection;
 use solana_sdk::pubkey::Pubkey;
 
-use crate::parser::accounts::AnchorAccount;
 use crate::parser::decoder::DecodedEvent;
 use crate::parser::events::PerpEvent;
 use crate::parser::lp::decoder::DecodedLpEvent;
 use crate::parser::lp::events::LpEvent;
-use crate::rpc::RpcClient;
+use rpc::AnchorAccount;
+use rpc::RpcClient;
 
 /// Persists a decoded event to Postgres. Events with no backing table (global/caps config
 /// changes) are acknowledged and dropped. `rpc`, when set, lets handlers enrich an event with

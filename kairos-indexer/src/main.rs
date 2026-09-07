@@ -18,7 +18,6 @@ pub mod db;
 pub mod handlers;
 pub mod health;
 pub mod parser;
-pub mod rpc;
 pub mod stream;
 
 pub use config::*;

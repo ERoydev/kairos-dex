@@ -5,7 +5,7 @@ use crate::db::entities::lp_events;
 use crate::db::queries;
 use crate::parser::lp::accounts::Pool;
 use crate::parser::lp::events::{Credited, Debited, Deposited, Withdrawn};
-use crate::rpc::RpcClient;
+use rpc::RpcClient;
 
 pub async fn deposited(
     db: &DatabaseConnection,

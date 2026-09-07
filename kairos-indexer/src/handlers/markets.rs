@@ -4,7 +4,7 @@ use crate::db::entities::markets;
 use crate::db::queries;
 use crate::parser::accounts::SynteticMarket;
 use crate::parser::events::{MarketInitialized, MarketPaused};
-use crate::rpc::RpcClient;
+use rpc::RpcClient;
 
 pub async fn market_initialized(
     db: &DatabaseConnection,

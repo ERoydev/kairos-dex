@@ -1662,8 +1662,8 @@ dependencies = [
  "chrono",
  "dotenv",
  "futures-util",
+ "kairos-rpc",
  "migration",
- "reqwest",
  "sea-orm",
  "sea-orm-migration",
  "serde",
@@ -1671,6 +1671,18 @@ dependencies = [
  "solana-sdk",
  "tokio",
  "tokio-tungstenite",
+]
+
+[[package]]
+name = "kairos-rpc"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "borsh",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "solana-sdk",
 ]
 
 [[package]]

@@ -11,7 +11,7 @@ use crate::handlers;
 use crate::health::HealthState;
 use crate::parser::lp;
 use crate::parser::parse_message;
-use crate::rpc::RpcClient;
+use rpc::RpcClient;
 
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 const INITIAL_BACKOFF: Duration = Duration::from_secs(1);

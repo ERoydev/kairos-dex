@@ -4,7 +4,7 @@ use crate::db::entities::funding_updates;
 use crate::db::queries;
 use crate::parser::accounts::SynteticMarket;
 use crate::parser::events::FundingUpdated;
-use crate::rpc::RpcClient;
+use rpc::RpcClient;
 
 pub async fn funding_updated(
     db: &DatabaseConnection,
