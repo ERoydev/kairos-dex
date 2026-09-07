@@ -1,0 +1,48 @@
+use borsh::BorshDeserialize;
+
+/// Marks a type as an Anchor account struct, tagging it with the 8-byte discriminator
+/// Anchor prefixes onto the account's raw data.
+pub trait AnchorAccount: BorshDeserialize {
+    const DISCRIMINATOR: [u8; 8];
+}
+
+#[derive(Debug)]
+pub enum AccountDecodeError {
+    TooShort,
+    DiscriminatorMismatch { expected: [u8; 8], actual: [u8; 8] },
+    Borsh(std::io::Error),
+}
+
+impl std::fmt::Display for AccountDecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TooShort => write!(f, "account data shorter than an 8-byte discriminator"),
+            Self::DiscriminatorMismatch { expected, actual } => {
+                write!(
+                    f,
+                    "discriminator mismatch: expected {expected:?}, got {actual:?}"
+                )
+            }
+            Self::Borsh(e) => write!(f, "borsh decode failed: {e}"),
+        }
+    }
+}
+
+/// Decodes raw account data (as returned by `getAccountInfo`) into `T`, verifying the
+/// 8-byte Anchor discriminator prefix matches before borsh-deserializing the rest.
+pub fn decode_account<T: AnchorAccount>(data: &[u8]) -> Result<T, AccountDecodeError> {
+    if data.len() < 8 {
+        return Err(AccountDecodeError::TooShort);
+    }
+
+    let (discriminator, mut rest) = data.split_at(8);
+    let discriminator: [u8; 8] = discriminator.try_into().unwrap();
+    if discriminator != T::DISCRIMINATOR {
+        return Err(AccountDecodeError::DiscriminatorMismatch {
+            expected: T::DISCRIMINATOR,
+            actual: discriminator,
+        });
+    }
+
+    T::deserialize(&mut rest).map_err(AccountDecodeError::Borsh)
+}
