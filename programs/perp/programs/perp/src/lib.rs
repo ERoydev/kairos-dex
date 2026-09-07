@@ -22,6 +22,7 @@ pub mod perp {
     use crate::close_position::_close_position;
     use crate::initialize_market::_initialize_market;
     use crate::liquidate::_liquidate;
+    use crate::update_funding::_update_funding;
 
     use super::*;
 
@@ -55,6 +56,10 @@ pub mod perp {
 
     pub fn liquidate(ctx: Context<Liquidate>) -> Result<()> {
         _liquidate(ctx)
+    }
+
+    pub fn update_funding(ctx: Context<UpdateFunding>) -> Result<()> {
+        _update_funding(ctx)
     }
 
     pub fn market_pause(ctx: Context<MarketPause>, is_active: bool) -> Result<()> {
