@@ -20,8 +20,9 @@ base64 = "0.22"
 chrono = "0.4"
 migration = { path = "migration" }
 
-# kairos-rpc 
+# kairos-rpc
 rpc = { package = "kairos-rpc", path = "../kairos-rpc" }
+kairos-db = { path = "../kairos-db" }
 
 [build-dependencies]
 serde_json = "1"

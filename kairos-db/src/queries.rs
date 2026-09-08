@@ -3,9 +3,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, Set,
 };
 
-use crate::db::entities::{
-    funding_updates, lp_events, lp_pool, markets, position_events, positions,
-};
+use crate::entities::{funding_updates, lp_events, lp_pool, markets, position_events, positions};
 
 pub async fn find_position(
     db: &DatabaseConnection,
@@ -92,6 +90,15 @@ async fn find_market(
     markets::Entity::find()
         .filter(markets::Column::MarketPubkey.eq(market_pubkey))
         .one(db)
+        .await
+}
+
+/// All markets the keeper should consider for funding/liquidation loops — lets callers read
+/// cached on-chain state (oi, last_funding_time, interval_seconds) without an RPC round trip.
+pub async fn find_active_markets(db: &DatabaseConnection) -> Result<Vec<markets::Model>, DbErr> {
+    markets::Entity::find()
+        .filter(markets::Column::IsActive.eq(true))
+        .all(db)
         .await
 }
 

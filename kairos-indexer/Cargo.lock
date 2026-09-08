@@ -1653,6 +1653,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kairos-db"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "sea-orm",
+ "serde",
+]
+
+[[package]]
 name = "kairos-indexer"
 version = "0.1.0"
 dependencies = [
@@ -1662,6 +1671,7 @@ dependencies = [
  "chrono",
  "dotenv",
  "futures-util",
+ "kairos-db",
  "kairos-rpc",
  "migration",
  "sea-orm",

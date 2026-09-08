@@ -1,0 +1,12 @@
+[package]
+name = "kairos-db"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "kairos_db"
+
+[dependencies]
+sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
+serde = { version = "1", features = ["derive"] }
+chrono = "0.4"
