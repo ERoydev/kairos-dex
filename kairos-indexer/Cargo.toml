@@ -18,7 +18,7 @@ solana-sdk = "4.0.1"
 borsh = { version = "1", features = ["derive"] }
 base64 = "0.22"
 chrono = "0.4"
-migration = { path = "migration" }
+migration = { path = "../kairos-db/migration" }
 
 # kairos-rpc
 rpc = { package = "kairos-rpc", path = "../kairos-rpc" }
