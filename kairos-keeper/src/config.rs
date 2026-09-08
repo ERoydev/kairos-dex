@@ -5,6 +5,7 @@ use solana_sdk::signature::{read_keypair_file, Keypair};
 
 pub struct Config {
     pub rpc_url: String,
+    pub database_url: String,
     pub perp_program_id: Pubkey,
     pub usdc_mint: Pubkey,
     pub keeper_keypair: Keypair,
@@ -15,6 +16,7 @@ impl Config {
     pub fn from_env() -> Self {
         Self {
             rpc_url: require_env("RPC_URL"),
+            database_url: require_env("DATABASE_URL"),
             perp_program_id: parse_env("PERP_PROGRAM_ID"),
             usdc_mint: parse_env("USDC_MINT"),
             keeper_keypair: load_keeper_keypair(),
