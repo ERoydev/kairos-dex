@@ -13,18 +13,8 @@ use axum::{Router, routing::get};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::DatabaseConnection;
 
-pub mod config;
-pub mod db;
-pub mod handlers;
-pub mod health;
-pub mod parser;
-pub mod stream;
-
-pub use config::*;
-pub use db::*;
-use health::{HealthState, health_handler};
-pub use parser::*;
-pub use stream::*;
+use kairos_indexer::health::{HealthState, health_handler};
+use kairos_indexer::*;
 
 struct AppState {
     pub db_pool: DatabaseConnection,

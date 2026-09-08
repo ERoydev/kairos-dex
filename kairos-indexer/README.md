@@ -39,6 +39,15 @@ cp .env.example .env   # DATABASE_URL, HELIUS_WEBHOOK_SECRET
 cargo run
 ```
 
+### Dev database helpers
+
+```bash
+cargo db-fresh   # drop all tables and reapply migrations (clean slate)
+cargo db-seed    # insert mock markets/positions so the keeper bot has something to scan
+```
+
+Both are aliases defined in `.cargo/config.toml`; `db-seed` runs `src/bin/seed.rs`, which seeds a few markets (some overdue for funding, some not) and a couple of open positions on the first one. `db-seed` clears its own tables before inserting, so it's safe to rerun on its own — no need to `db-fresh` in between.
+
 ## Related services
 
 - `kairos-api` — reads from the same Postgres DB

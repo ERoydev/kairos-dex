@@ -1,2 +1,3 @@
 [alias]
 db-fresh = "run --manifest-path migration/Cargo.toml -- fresh"
+db-seed = "run --bin seed"
