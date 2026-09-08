@@ -18,6 +18,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Markets::OiShort).big_integer().not_null().default(0))
                     .col(ColumnDef::new(Markets::CumulativeFundingIndex).big_integer().not_null().default(0))
                     .col(ColumnDef::new(Markets::LastFundingTime).big_integer().not_null().default(0))
+                    .col(ColumnDef::new(Markets::IntervalSeconds).integer().not_null().default(0))
                     .col(ColumnDef::new(Markets::IsActive).boolean().not_null().default(true))
                     .col(ColumnDef::new(Markets::UpdatedAt).timestamp_with_time_zone().not_null().default(Expr::current_timestamp()))
                     .to_owned(),
@@ -41,6 +42,7 @@ enum Markets {
     OiShort,
     CumulativeFundingIndex,
     LastFundingTime,
+    IntervalSeconds,
     IsActive,
     UpdatedAt,
 }

@@ -18,6 +18,7 @@ pub struct Model {
     pub oi_short: i64,
     pub cumulative_funding_index: i64,
     pub last_funding_time: i64,
+    pub interval_seconds: i32,
     pub is_active: bool,
     pub updated_at: DateTimeWithTimeZone,
 }

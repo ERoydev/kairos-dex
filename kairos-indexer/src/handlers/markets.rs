@@ -11,11 +11,17 @@ pub async fn market_initialized(
     rpc: Option<&RpcClient>,
     e: MarketInitialized,
 ) -> Result<(), DbErr> {
-    // `oracle` isn't in this event, but it's a field on the SynteticMarket account itself.
-    let oracle = super::fetch_account::<SynteticMarket>(rpc, &e.market, "market_initialized")
-        .await
-        .map(|account| account.oracle.to_string())
-        .unwrap_or_default();
+    // `oracle`/`interval_seconds` aren't in this event, but they're fields on the SynteticMarket account itself.
+    let (oracle, interval_seconds) =
+        super::fetch_account::<SynteticMarket>(rpc, &e.market, "market_initialized")
+            .await
+            .map(|account| {
+                (
+                    account.oracle.to_string(),
+                    account.funding_config.interval_seconds as i32,
+                )
+            })
+            .unwrap_or_default();
 
     queries::insert_market(
         db,
@@ -23,6 +29,7 @@ pub async fn market_initialized(
             market_pubkey: Set(e.market.to_string()),
             symbol: Set(e.symbol_str()),
             oracle: Set(oracle),
+            interval_seconds: Set(interval_seconds),
             ..Default::default()
         },
     )

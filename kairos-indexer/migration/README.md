@@ -43,6 +43,16 @@
 
 # Workflow
 
+## Reset on clean
+
+To reset the local dev database to a clean state (drop all tables, reapply all migrations), run from the repo root:
+```bash
+cargo db-fresh
+```
+This is a cargo alias defined in `.cargo/config.toml` for `cargo run --manifest-path migration/Cargo.toml -- fresh`. It picks up `DATABASE_URL` from the repo-root `.env` automatically.
+
+## Migration 
+
 1. Define migration in Rust (schemas)
 2. Register it in `migration/src/lib.rs`:
 3. Run the migration:
