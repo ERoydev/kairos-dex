@@ -747,6 +747,7 @@ dependencies = [
  "chrono",
  "sea-orm",
  "serde",
+ "tracing",
 ]
 
 [[package]]
