@@ -2,6 +2,7 @@
 name = "kairos-keeper"
 version = "0.1.0"
 edition = "2024"
+default-run = "kairos-keeper"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -15,6 +16,21 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rpc = { package = "kairos-rpc", path = "../kairos-rpc" }
 kairos-db = { path = "../kairos-db" }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+# Local dev only (see `dev-db` feature): sqlite driver + migrations, reusing kairos-db's
+# entities/schema. Not pulled in by a default/prod build.
+sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"], optional = true }
+migration = { path = "../kairos-db/migration", optional = true }
+
+[features]
+dev-db = ["dep:sea-orm", "dep:migration"]
+
+[[bin]]
+name = "seed"
+path = "src/bin/seed.rs"
+required-features = ["dev-db"]
 
 [build-dependencies]
 serde_json = "1"

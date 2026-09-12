@@ -1,8 +1,9 @@
 use std::env;
 
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::signature::{read_keypair_file, Keypair};
+use solana_sdk::signature::{Keypair, read_keypair_file};
 
+#[allow(unused)]
 pub struct Config {
     pub rpc_url: String,
     pub database_url: String,
@@ -47,11 +48,9 @@ fn load_keeper_keypair() -> Keypair {
         (Ok(path), Err(_)) => read_keypair_file(&path)
             .unwrap_or_else(|e| panic!("failed to read keypair at `{path}`: {e}")),
         (Err(_), Ok(secret)) => Keypair::from_base58_string(&secret),
-        (Ok(_), Ok(_)) => panic!(
-            "set only one of KEEPER_KEYPAIR_PATH or KEEPER_KEYPAIR_SECRET, not both"
-        ),
-        (Err(_), Err(_)) => panic!(
-            "set one of KEEPER_KEYPAIR_PATH or KEEPER_KEYPAIR_SECRET"
-        ),
+        (Ok(_), Ok(_)) => {
+            panic!("set only one of KEEPER_KEYPAIR_PATH or KEEPER_KEYPAIR_SECRET, not both")
+        }
+        (Err(_), Err(_)) => panic!("set one of KEEPER_KEYPAIR_PATH or KEEPER_KEYPAIR_SECRET"),
     }
 }
