@@ -126,7 +126,9 @@ pub(crate) async fn fetch_account<T: AnchorAccount>(
             Ok(None) if attempt < ACCOUNT_FETCH_RETRIES => {
                 tokio::time::sleep(ACCOUNT_FETCH_RETRY_DELAY).await;
             }
-            Ok(None) => eprintln!("{context}: account {pubkey} still not found after {attempt} attempts"),
+            Ok(None) => {
+                eprintln!("{context}: account {pubkey} still not found after {attempt} attempts")
+            }
             Err(err) => {
                 eprintln!("{context}: failed to fetch account {pubkey}: {err}");
                 return None;

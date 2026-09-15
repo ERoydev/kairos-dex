@@ -114,10 +114,8 @@ fn setup() -> Env {
 }
 
 fn market_state(env: &Env) -> SynteticMarket {
-    SynteticMarket::try_deserialize(
-        &mut env.svm.get_account(&env.market).unwrap().data.as_slice(),
-    )
-    .unwrap()
+    SynteticMarket::try_deserialize(&mut env.svm.get_account(&env.market).unwrap().data.as_slice())
+        .unwrap()
 }
 
 /// `FundingFees` starts at `last_funding_time = 0` and LiteSVM's clock also

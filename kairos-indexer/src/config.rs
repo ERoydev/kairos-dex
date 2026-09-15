@@ -2,8 +2,10 @@ use std::str::FromStr;
 
 use solana_sdk::pubkey::Pubkey;
 
-const DEPLOYED_PROGRAMS_JSON: &str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/../programs/deployed_programs.json");
+const DEPLOYED_PROGRAMS_JSON: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../programs/deployed_programs.json"
+);
 
 pub struct Config {
     pub rpc_ws_url: String,
@@ -28,7 +30,7 @@ impl Config {
 
     /// Get smart contract deployed program on devnet, from the json file stored
     fn get_smart_contract_ids() -> (Pubkey, Pubkey) {
-         let deployed: serde_json::Value = serde_json::from_str(
+        let deployed: serde_json::Value = serde_json::from_str(
             &std::fs::read_to_string(DEPLOYED_PROGRAMS_JSON)
                 .unwrap_or_else(|e| panic!("failed to read {DEPLOYED_PROGRAMS_JSON}: {e}")),
         )
