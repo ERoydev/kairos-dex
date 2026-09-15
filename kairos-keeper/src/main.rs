@@ -19,7 +19,19 @@ use tokio::sync::mpsc;
 
 use crate::queue::TaskQueue;
 
-#[tokio::main]
+// Tokio creates a pool of OS worker threads
+// Then tokio::spawn() creates a tokio task, which tokio schedules
+// onto one of those existing worker threads
+
+// Tokio
+// ├── OS Thread 1
+// │   ├── Task A
+// │   └── Task C
+// ├── OS Thread 2
+// │   └── Task B
+// └── OS Thread 3
+//     └── Task D
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     dotenv::dotenv().ok();
     tracing_subscriber::fmt()
@@ -47,7 +59,7 @@ async fn main() {
     });
 
     let queue_handle = tokio::spawn(async move {
-        let mut task_queue = TaskQueue::new(rx);
+        let task_queue = TaskQueue::new(rx);
         task_queue.run().await;
     });
 
