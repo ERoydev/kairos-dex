@@ -1,7 +1,13 @@
 use std::env;
+use std::str::FromStr;
 
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Keypair, read_keypair_file};
+
+const DEPLOYED_PROGRAMS_JSON: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../programs/deployed_programs.json"
+);
 
 #[allow(unused)]
 pub struct Config {
@@ -15,14 +21,27 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Self {
+        let perp_program_id = Config::get_smart_contract_id();
+
         Self {
             rpc_url: require_env("RPC_URL"),
             database_url: require_env("DATABASE_URL"),
-            perp_program_id: parse_env("PERP_PROGRAM_ID"),
+            perp_program_id,
             usdc_mint: parse_env("USDC_MINT"),
             keeper_keypair: load_keeper_keypair(),
             liquidation_poll_interval_secs: parse_env("LIQUIDATION_POLL_INTERVAL_SECS"),
         }
+    }
+
+    /// Get smart contract deployed program on devnet, from the json file stored
+    fn get_smart_contract_id() -> Pubkey {
+        let deployed: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(DEPLOYED_PROGRAMS_JSON)
+                .unwrap_or_else(|e| panic!("failed to read {DEPLOYED_PROGRAMS_JSON}: {e}")),
+        )
+        .unwrap_or_else(|e| panic!("failed to parse {DEPLOYED_PROGRAMS_JSON}: {e}"));
+
+        parse_pubkey_json(&deployed, "perp")
     }
 }
 
@@ -53,4 +72,11 @@ fn load_keeper_keypair() -> Keypair {
         }
         (Err(_), Err(_)) => panic!("set one of KEEPER_KEYPAIR_PATH or KEEPER_KEYPAIR_SECRET"),
     }
+}
+
+fn parse_pubkey_json(deployed: &serde_json::Value, program_name: &str) -> Pubkey {
+    let raw = deployed[program_name]["devnet"]
+        .as_str()
+        .unwrap_or_else(|| panic!("no devnet id for '{program_name}' in {DEPLOYED_PROGRAMS_JSON}"));
+    Pubkey::from_str(raw).unwrap_or_else(|e| panic!("invalid {program_name} id '{raw}': {e}"))
 }
