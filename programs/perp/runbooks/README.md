@@ -7,6 +7,9 @@
 ### deployment
 Deploy programs
 
+### initialization
+Run one-time admin init instructions (`initialize_global`, `initialize_market`) against a deployed program. Run after `deployment`, same `--env`.
+
 ## Getting Started
 
 This repository is using [Surfpool](https://surfpool.run) as a part of its development workflow.
@@ -74,4 +77,15 @@ $ surfpool start --watch
 ### Execute an existing runbook
 ```console
 $ surfpool run deployment
+```
+
+### Deploy + initialize on devnet
+```console
+$ surfpool run deployment --env devnet --unsupervised
+$ surfpool run initialization --env devnet --unsupervised
+```
+
+Dry-run the plan first (no signing/broadcast):
+```console
+$ surfpool run initialization --env devnet --explain
 ```

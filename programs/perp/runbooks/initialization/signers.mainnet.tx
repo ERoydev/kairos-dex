@@ -1,0 +1,8 @@
+
+// For mainnet, use a web wallet, hardware wallet, or multisig - never a raw secret_key signer.
+
+signer "payer" "svm::web_wallet" {
+    description = "Pays fees and signs admin init instructions"
+    // expected_address = input.expected_payer_address
+    // See documentation for other options (squads, etc): https://docs.surfpool.run/iac/svm/signers
+}

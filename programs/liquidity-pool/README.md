@@ -24,7 +24,17 @@ The perp program is the one that knows the PnL, so it decides which to call and 
 
 # Deploy on Devnet
 
+## Before running into deployment
+- Shut the old program down permanently and refund SOL it held, so the program ID becomes dead forever (can't redeploy or revoke again)
+
+```bash
+solana program close <address> --url devnet --keypair ~/.config/solana/id.json --bypass-warning
+```
+
+
 ```bash
 anchor build
-surfpool run deployment --env devnet
+surfpool run deployment --env devnet --unsupervised
 ```
+
+

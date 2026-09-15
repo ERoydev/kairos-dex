@@ -1,0 +1,79 @@
+################################################################
+# One-time admin bootstrap for a freshly deployed perp program:
+# initialize_global -> initialize_market
+#
+# Run AFTER the `deployment` runbook, against the same env:
+#   surfpool run deployment --env devnet --unsupervised
+#   surfpool run initialization --env devnet --unsupervised
+#
+# Sanity-check the plan first with:
+#   surfpool run initialization --env devnet --explain
+################################################################
+
+addon "svm" {
+    rpc_api_url = input.rpc_api_url
+    network_id = input.network_id
+}
+
+variable "program" {
+    value = svm::get_program_from_anchor_project("perp")
+}
+
+action "init_global" "svm::process_instructions" {
+    description = "Create GlobalConfig (admin: initialize_global)"
+    instruction {
+        program_idl = variable.program.idl
+        instruction_name = "initialize_global"
+        instruction_args = [input.fee_receiver, input.max_markets]
+
+        payer {
+            public_key = signer.payer.public_key
+        }
+        // global_config / system_program are PDAs / well-known accounts derivable
+        // from the IDL's seed metadata (seeds = [GLOBAL_SEED]) - txtx should resolve
+        // them automatically. If `--explain` shows them unresolved, add explicit
+        // blocks here, e.g.:
+        // global_config { public_key = svm::find_pda(variable.program.program_id, ["global"]).pda }
+        // system_program { public_key = svm::system_program_id() }
+    }
+    signers = [signer.payer]
+}
+
+action "init_market" "svm::process_instructions" {
+    description = "Create the ${input.market_symbol} market (admin: initialize_market)"
+    instruction {
+        program_idl = variable.program.idl
+        instruction_name = "initialize_market"
+        instruction_args = [
+            input.market_symbol_bytes,
+            {
+                max_leverage = input.max_leverage
+                mmr_bps = input.mmr_bps
+                feed_id = input.pyth_feed_id_hex
+            }
+        ]
+
+        payer {
+            public_key = signer.payer.public_key
+        }
+        // Not derivable from this program's own IDL - must be supplied explicitly:
+        oracle {
+            public_key = input.pyth_price_feed
+        }
+        usdc_mint {
+            public_key = input.usdc_mint
+        }
+        token_program {
+            public_key = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+        // global_config, market, vault, insurance_fund_vault: same-program PDAs,
+        // should auto-resolve from IDL seed metadata.
+        // lp_pool: PDA on the liquidity-pool program (seeds::program) - if it does
+        // NOT auto-resolve, uncomment and set the deployed liquidity_pool program id:
+        // lp_pool {
+        //     public_key = svm::find_pda(input.liquidity_pool_program_id, ["liquidity_pool"]).pda
+        // }
+    }
+    signers = [signer.payer]
+    depends_on = [action.init_global]
+}
