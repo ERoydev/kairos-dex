@@ -40,8 +40,9 @@ async fn main() {
 
     let (tx, rx) = mpsc::channel::<Task>(100);
 
-    let config = Config::from_env();
-    let db = kairos_db::create_pool(&config.database_url).await;
+    Config::from_env().init();
+    let db = kairos_db::create_pool(&config::get().database_url).await;
+    let rpc_client = rpc::RpcClient::new(config::get().rpc_url.clone());
     // Dev-only (see `dev-db` feature): auto-creates/updates the schema, so a local sqlite
     // DATABASE_URL just works — delete dev.db and rerun to reset.
     #[cfg(feature = "dev-db")]

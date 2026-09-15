@@ -1,5 +1,6 @@
 use std::env;
 use std::str::FromStr;
+use std::sync::OnceLock;
 
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Keypair, read_keypair_file};
@@ -33,6 +34,14 @@ impl Config {
         }
     }
 
+    /// Publishes `self` as the process-wide config. Must be called exactly once, before any
+    /// `config::get()` call — `main` does this right after `Config::from_env()`.
+    pub fn init(self) {
+        CONFIG
+            .set(self)
+            .unwrap_or_else(|_| panic!("Config::init called more than once"));
+    }
+
     /// Get smart contract deployed program on devnet, from the json file stored
     fn get_smart_contract_id() -> Pubkey {
         let deployed: serde_json::Value = serde_json::from_str(
@@ -43,6 +52,17 @@ impl Config {
 
         parse_pubkey_json(&deployed, "perp")
     }
+}
+
+static CONFIG: OnceLock<Config> = OnceLock::new();
+
+/// Returns the process-wide config set by `Config::init`. Panics if that hasn't run yet — every
+/// task spawned after `main` calls it can rely on this instead of having `Config` threaded
+/// through as a parameter.
+pub fn get() -> &'static Config {
+    CONFIG
+        .get()
+        .expect("Config::init must be called before config::get()")
 }
 
 fn require_env(key: &str) -> String {
