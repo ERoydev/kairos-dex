@@ -2,6 +2,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::Deserialize;
 use serde_json::json;
+use solana_sdk::hash::{Hash, ParseHashError};
 use solana_sdk::pubkey::Pubkey;
 
 use crate::account::{AccountDecodeError, AnchorAccount, decode_account};
@@ -65,6 +66,27 @@ impl RpcClient {
             .map(Some)
             .map_err(RpcError::InvalidBase64)
     }
+
+    /// Fetches the latest blockhash, used as the recent-blockhash on new transactions.
+    pub async fn get_latest_blockhash(&self) -> Result<Hash, RpcError> {
+        let body = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getLatestBlockhash",
+            "params": [{ "commitment": "confirmed" }]
+        });
+
+        let response: GetLatestBlockhashResponse = self
+            .http
+            .post(&self.url)
+            .json(&body)
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        response.result.value.blockhash.parse().map_err(RpcError::InvalidHash)
+    }
 }
 
 #[derive(Debug)]
@@ -72,6 +94,7 @@ pub enum RpcError {
     Http(reqwest::Error),
     InvalidBase64(base64::DecodeError),
     Decode(AccountDecodeError),
+    InvalidHash(ParseHashError),
 }
 
 impl std::fmt::Display for RpcError {
@@ -80,6 +103,7 @@ impl std::fmt::Display for RpcError {
             Self::Http(e) => write!(f, "RPC request failed: {e}"),
             Self::InvalidBase64(e) => write!(f, "invalid base64 account data: {e}"),
             Self::Decode(e) => write!(f, "failed to decode account: {e}"),
+            Self::InvalidHash(e) => write!(f, "invalid blockhash: {e}"),
         }
     }
 }
@@ -104,4 +128,19 @@ struct RpcResult {
 struct AccountInfoValue {
     /// `[data, encoding]` — we always request `"base64"` encoding.
     data: (String, String),
+}
+
+#[derive(Debug, Deserialize)]
+struct GetLatestBlockhashResponse {
+    result: GetLatestBlockhashResult,
+}
+
+#[derive(Debug, Deserialize)]
+struct GetLatestBlockhashResult {
+    value: BlockhashValue,
+}
+
+#[derive(Debug, Deserialize)]
+struct BlockhashValue {
+    blockhash: String,
 }
