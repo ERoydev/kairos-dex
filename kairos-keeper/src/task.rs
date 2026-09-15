@@ -1,6 +1,15 @@
-use std::cmp::{Ordering, Reverse};
+use std::{
+    cmp::{Ordering, Reverse},
+    str::FromStr,
+};
 
-use crate::now_unix;
+use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction};
+
+use crate::{
+    error::Result,
+    now_unix,
+    tx_builder::{build_liquidate_ix, build_update_funding_ix},
+};
 
 /// For a keeper hittin Solana RPC, 3 is sane deafult,
 /// since after some time this taks is not usefull anymore
@@ -108,5 +117,34 @@ impl Task {
             created_at: now_unix(),
             error: String::new(),
         }
+    }
+
+    pub async fn prepare_perp_tx(
+        &self,
+        keeper_keypair: &Keypair,
+        rpc_client: &rpc::RpcClient,
+    ) -> Result<Transaction> {
+        let signer = keeper_keypair.pubkey();
+
+        let instruction = match self.task_type {
+            TaskType::FundingTick => {
+                let market_pubkey = Pubkey::from_str(&self.id)?;
+                build_update_funding_ix(signer, market_pubkey)
+            }
+            TaskType::LiquidationCheck => {
+                let position_pubkey = Pubkey::from_str(&self.id)?;
+                let usdc_mint = crate::config::get().usdc_mint;
+                build_liquidate_ix(rpc_client, signer, position_pubkey, usdc_mint).await?
+            }
+        };
+
+        let recent_blockhash = rpc_client.get_latest_blockhash().await?;
+
+        Ok(Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&signer),
+            &[keeper_keypair],
+            recent_blockhash,
+        ))
     }
 }
