@@ -1,8 +1,10 @@
 mod config;
+mod error;
 mod funding;
 mod liquidation;
 mod queue;
 mod task;
+mod tx_builder;
 mod utils;
 
 pub use funding::*;
@@ -60,7 +62,7 @@ async fn main() {
     });
 
     let queue_handle = tokio::spawn(async move {
-        let task_queue = TaskQueue::new(rx);
+        let task_queue = TaskQueue::new(rx, rpc_client);
         task_queue.run().await;
     });
 

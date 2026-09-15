@@ -40,7 +40,10 @@ impl RpcClient {
         decode_account(&data).map(Some).map_err(RpcError::Decode)
     }
 
-    async fn get_account_data(&self, pubkey: &Pubkey) -> Result<Option<Vec<u8>>, RpcError> {
+    /// Fetches raw (still-encoded-then-decoded-from-base64) account bytes without assuming any
+    /// particular Anchor account type — useful when the caller wants to deserialize with a
+    /// decoder other than `AnchorAccount` (e.g. a foreign crate's own `AccountDeserialize` impl).
+    pub async fn get_account_data(&self, pubkey: &Pubkey) -> Result<Option<Vec<u8>>, RpcError> {
         let body = json!({
             "jsonrpc": "2.0",
             "id": 1,
