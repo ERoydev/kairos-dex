@@ -1,0 +1,41 @@
+################################################################
+# Admin bootstrap: create the Pool, its USDC vault, and the LP mint.
+#
+# Run ONCE per deployed program:
+#   surfpool run init-pool --env devnet -u
+#
+# Re-running fails with "Allocate: account ... already in use" - that
+# means the Pool already exists, not that anything is broken.
+################################################################
+
+addon "svm" {
+    rpc_api_url = input.rpc_api_url
+    network_id = input.network_id
+}
+
+variable "program" {
+    value = svm::get_program_from_anchor_project("liquidity_pool")
+}
+
+action "init_pool" "svm::process_instructions" {
+    description = "Create the Pool, USDC vault, and LP mint (authority: initialize_pool)"
+    instruction {
+        program_idl = variable.program.idl
+        instruction_name = "initialize_pool"
+
+        authority {
+            public_key = signer.payer.public_key
+        }
+        // Not derivable from this program's own IDL - must be supplied explicitly:
+        usdc_mint {
+            public_key = input.usdc_mint
+        }
+        perp_program {
+            public_key = input.perp_program_id
+        }
+        // pool / usdc_vault / lp_mint: PDAs derivable from the IDL's seed
+        // metadata (seeds = [LIQUIDITY_POOL_SEED] / [USDC_VAULT_SEED] / [LP_MINT_SEED]).
+        // token_program / system_program: well-known addresses, auto-resolve.
+    }
+    signers = [signer.payer]
+}

@@ -5,13 +5,28 @@ runbooks:
   - name: deployment
     description: Deploy programs
     location: runbooks/deployment
-  - name: initialization
-    description: Run one-time admin init instructions (initialize_global, initialize_market)
-    location: runbooks/initialization
+  - name: init-global
+    description: "Step 1: create GlobalConfig (once per deployed program)"
+    location: runbooks/init-global
+  - name: init-market
+    description: "Step 3: create a market. Needs GlobalConfig + the LP pool (step 2, scripts/ts/02_init_lp_pool.ts)"
+    location: runbooks/init-market
 environments:
   devnet:
       network_id: devnet
       rpc_api_url: https://api.devnet.solana.com
-      payer_keypair_json: ~/.config/solana/id.json
-      authority_keypair_json: ~/.config/solana/id.json
+      payer_keypair_json: ~/.config/solana/kairos/admin_keypair.json
+      authority_keypair_json: ~/.config/solana/kairos/admin_keypair.json
+
+      # initialize_global args
+      fee_receiver: "B3eupaAjiJzrBzVG1cX4VLsygDKE5SFiCX8kp1VDYvE7"      # admin wallet to receive protocol fees
+      max_markets: 16
+
+      # initialize_market args
+      market_symbol: "SOL-PERP"                       # also encoded to the [u8; 16] symbol arg in main.tx
+      max_leverage: 20
+      mmr_bps: 500
+      pyth_feed_id_hex: "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d"  # Crypto.SOL/USD (Hermes), no 0x prefix
+      pyth_price_feed: "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE"  # PDA: PythSolanaReceiver.getPriceFeedAccountAddress(shard=0, feed_id) - verified live on devnet
+      usdc_mint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"  # devnet USDC mint (same one used in scripts/ts/common.ts)
 

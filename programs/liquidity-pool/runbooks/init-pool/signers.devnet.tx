@@ -1,0 +1,10 @@
+
+// Keypair file rather than svm::web_wallet so the runbook can run with
+// --unsupervised; web_wallet needs a browser to sign, and unsupervised runs
+// abort with "unsupervised executions should not be generating actions".
+signer "payer" "svm::secret_key" {
+    description = "Pays fees and signs the initialize_pool instruction"
+    keypair_json = input.payer_keypair_json
+    // Must match the program's pool authority (authority used in initialize_pool).
+    // expected_address = "zbBjhHwuqyKMmz8ber5oUtJJ3ZV4B6ePmANfGyKzVGV"
+}

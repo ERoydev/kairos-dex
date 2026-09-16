@@ -7,6 +7,9 @@
 ### deployment
 Deploy programs
 
+### init-pool
+Create the Pool, USDC vault, and LP mint (once per deployed program)
+
 ## Getting Started
 
 This repository is using [Surfpool](https://surfpool.run) as a part of its development workflow.
@@ -64,6 +67,7 @@ Our [Surfpool 101 Series](https://www.youtube.com/playlist?list=PL0FMgRjJMRzO1Fd
 $ surfpool ls
 Name                                    Description
 deployment                              Deploy programs
+init-pool                               Create the Pool, USDC vault, and LP mint (once per deployed program)
 ```
 
 ### Start a Surfnet, automatically executing the `deployment` runbook on program recompile:

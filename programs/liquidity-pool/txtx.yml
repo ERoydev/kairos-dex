@@ -5,12 +5,16 @@ runbooks:
   - name: deployment
     description: Deploy programs
     location: runbooks/deployment
+  - name: init-pool
+    description: "Create the Pool, USDC vault, and LP mint (once per deployed program)"
+    location: runbooks/init-pool
 environments:
-  localnet:
-      network_id: localnet
-      rpc_api_url: http://127.0.0.1:8899
   devnet:
       network_id: devnet
       rpc_api_url: https://api.devnet.solana.com
       payer_keypair_json: ~/.config/solana/id.json
       authority_keypair_json: ~/.config/solana/id.json
+
+      # initialize_pool args
+      usdc_mint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"  # devnet USDC mint (same one used in scripts/ts/common.ts)
+      perp_program_id: "Ha7eXehmxwvsNXi8qAZWo63JRccYQm3Me6MJu6ewaRwS"  # deployed perp program id (devnet)

@@ -1,0 +1,35 @@
+################################################################
+# Step 1 of admin bootstrap: create GlobalConfig.
+#
+# Run ONCE per deployed program:
+#   surfpool run init-global --env devnet -u
+#
+# Re-running fails with "Allocate: account ... already in use" - that
+# means GlobalConfig already exists, not that anything is broken.
+# To change its values afterwards, use update_global, not this runbook.
+################################################################
+
+addon "svm" {
+    rpc_api_url = input.rpc_api_url
+    network_id = input.network_id
+}
+
+variable "program" {
+    value = svm::get_program_from_anchor_project("perp")
+}
+
+action "init_global" "svm::process_instructions" {
+    description = "Create GlobalConfig (admin: initialize_global)"
+    instruction {
+        program_idl = variable.program.idl
+        instruction_name = "initialize_global"
+        instruction_args = [input.fee_receiver, input.max_markets]
+
+        payer {
+            public_key = signer.payer.public_key
+        }
+        // global_config / system_program are PDAs / well-known accounts derivable
+        // from the IDL's seed metadata (seeds = [GLOBAL_SEED]).
+    }
+    signers = [signer.payer]
+}

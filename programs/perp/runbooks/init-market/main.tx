@@ -1,13 +1,14 @@
 ################################################################
-# One-time admin bootstrap for a freshly deployed perp program:
-# initialize_global -> initialize_market
+# Step 3 of admin bootstrap: create one perp market.
 #
-# Run AFTER the `deployment` runbook, against the same env:
-#   surfpool run deployment --env devnet --unsupervised
-#   surfpool run initialization --env devnet --unsupervised
+# PREREQUISITES - both must already exist on-chain or this fails:
+#   1. GlobalConfig      -> surfpool run init-global --env devnet -u
+#   2. The LP pool PDA   -> npx tsx scripts/ts/02_init_lp_pool.ts
+#      (missing LP pool shows up as: AnchorError caused by account: lp_pool,
+#       Error Code: AccountNotInitialized)
 #
-# Sanity-check the plan first with:
-#   surfpool run initialization --env devnet --explain
+# Then:
+#   surfpool run init-market --env devnet -u
 ################################################################
 
 addon "svm" {
@@ -19,24 +20,12 @@ variable "program" {
     value = svm::get_program_from_anchor_project("perp")
 }
 
-action "init_global" "svm::process_instructions" {
-    description = "Create GlobalConfig (admin: initialize_global)"
-    instruction {
-        program_idl = variable.program.idl
-        instruction_name = "initialize_global"
-        instruction_args = [input.fee_receiver, input.max_markets]
-
-        payer {
-            public_key = signer.payer.public_key
-        }
-        // global_config / system_program are PDAs / well-known accounts derivable
-        // from the IDL's seed metadata (seeds = [GLOBAL_SEED]) - txtx should resolve
-        // them automatically. If `--explain` shows them unresolved, add explicit
-        // blocks here, e.g.:
-        // global_config { public_key = svm::find_pda(variable.program.program_id, ["global"]).pda }
-        // system_program { public_key = svm::system_program_id() }
-    }
-    signers = [signer.payer]
+// "SOL-PERP" as UTF-8, zero-padded to [u8; 16]. Lives here rather than in
+// txtx.yml because manifest environment values must be scalars - a YAML
+// sequence fails to parse ("invalid type: sequence, expected a string").
+// Keep in sync with input.market_symbol.
+variable "market_symbol_bytes" {
+    value = [83, 79, 76, 45, 80, 69, 82, 80, 0, 0, 0, 0, 0, 0, 0, 0]
 }
 
 action "init_market" "svm::process_instructions" {
@@ -45,7 +34,7 @@ action "init_market" "svm::process_instructions" {
         program_idl = variable.program.idl
         instruction_name = "initialize_market"
         instruction_args = [
-            input.market_symbol_bytes,
+            variable.market_symbol_bytes,
             {
                 max_leverage = input.max_leverage
                 mmr_bps = input.mmr_bps
@@ -75,5 +64,4 @@ action "init_market" "svm::process_instructions" {
         // }
     }
     signers = [signer.payer]
-    depends_on = [action.init_global]
 }
