@@ -5,8 +5,8 @@ use chrono::Utc;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use solana_sdk::pubkey::Pubkey;
 
-use kairos_indexer::db::{create_pool, entities::markets, entities::positions};
 use kairos_indexer::Config;
+use kairos_indexer::db::{create_pool, entities::markets, entities::positions};
 
 #[tokio::main]
 async fn main() {

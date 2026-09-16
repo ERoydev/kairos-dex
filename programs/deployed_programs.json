@@ -1,0 +1,12 @@
+{
+  "liquidity_pool": {
+    "localnet": null,
+    "devnet": "FQmcn1nu5DxVKjuitVFeQQ4vQj9ZR9wMUMJhuFyjLbJJ",
+    "mainnet": null
+  },
+  "perp": {
+    "localnet": null,
+    "devnet": "AWfKCt6Mu5YHRbRwDPSkSxXERFC7etE9coSz2ddXjpcJ",
+    "mainnet": null
+  }
+}

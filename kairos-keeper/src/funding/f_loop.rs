@@ -1,26 +1,33 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use kairos_db::{DatabaseConnection, DbErr, queries};
 use tokio::sync::mpsc::Sender;
 
-use crate::queue::Job;
+use crate::{
+    now_unix,
+    task::{Task, TaskType},
+};
 
 /// Scans cached market state in Postgres (populated by kairos-indexer) instead of hitting RPC,
 /// and pushes a `FundingTick` for every market whose on-chain funding interval has elapsed.
 pub struct FLoop {
     db: DatabaseConnection,
-    tx: Sender<Job>,
+    tx: Sender<Task>,
     /// Poll cadence used only when there are no active markets to derive one from.
     fallback_interval: Duration,
 }
 
 impl FLoop {
-    pub fn new(db: DatabaseConnection, tx: Sender<Job>, fallback_interval: Duration) -> Self {
+    pub fn new(db: DatabaseConnection, tx: Sender<Task>, fallback_interval: Duration) -> Self {
         Self {
             db,
             tx,
             fallback_interval,
         }
+    }
+
+    pub fn get_task_type(&self) -> TaskType {
+        TaskType::FundingTick
     }
 
     pub async fn run(&self) {
@@ -42,17 +49,19 @@ impl FLoop {
     async fn tick(&self) -> Result<Duration, DbErr> {
         let now = now_unix();
         let markets = queries::find_active_markets(&self.db).await?;
+        tracing::info!("Funding loop tick, active markets: {:#?}", markets);
 
         for market in &markets {
             let elapsed = now - market.last_funding_time;
             if elapsed >= market.interval_seconds as i64 {
-                self.tx
-                    .send(Job::FundingTick(market.market_pubkey.clone()))
-                    .await
-                    .ok();
+                let task = Task::new(&market.market_pubkey, self.get_task_type());
+                // If enough time passed, then send the market as a job to the queue
+                self.tx.send(task).await.ok();
             }
         }
 
+        // Take the smallest interval secs from all active markets
+        // or `fallback_interval` if there are none active
         let next = markets
             .iter()
             .map(|m| m.interval_seconds.max(1) as u64)
@@ -61,11 +70,4 @@ impl FLoop {
             .unwrap_or(self.fallback_interval);
         Ok(next)
     }
-}
-
-fn now_unix() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system clock before unix epoch")
-        .as_secs() as i64
 }

@@ -14,4 +14,8 @@ start:
 integration-test:
 	./test-integration.sh
 
+deploy-devnet:
+	surfpool run deployment --env devnet --unsupervised
+# 	surfpool run initialization --env devnet --unsupervised
+
 # surfpool run deployment --env localnet

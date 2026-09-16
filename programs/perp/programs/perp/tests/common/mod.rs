@@ -100,6 +100,30 @@ pub fn widen_market_caps(svm: &mut LiteSVM, market: &Pubkey, caps: TvlScaledCaps
     svm.set_account(*market, account).unwrap();
 }
 
+/// Overwrites a market's `oi_long`/`oi_short` directly, bypassing `open_position`.
+/// Used by funding-rate tests that need a specific skew without actually opening
+/// positions of that exact size.
+pub fn set_market_oi(svm: &mut LiteSVM, market: &Pubkey, oi_long: u64, oi_short: u64) {
+    let mut account = svm.get_account(market).expect("market not found");
+    let mut data = SynteticMarket::try_deserialize(&mut account.data.as_slice()).unwrap();
+    data.oi_long = oi_long;
+    data.oi_short = oi_short;
+
+    let mut new_data = Vec::new();
+    data.try_serialize(&mut new_data).unwrap();
+    account.data = new_data;
+    svm.set_account(*market, account).unwrap();
+}
+
+/// Advances LiteSVM's `Clock` sysvar to `unix_timestamp`, leaving slot/epoch
+/// fields untouched. Used to satisfy/violate `update_funding`'s
+/// `interval_seconds` gate without waiting in real time.
+pub fn warp_clock_to(svm: &mut LiteSVM, unix_timestamp: i64) {
+    let mut clock = svm.get_sysvar::<anchor_lang::solana_program::clock::Clock>();
+    clock.unix_timestamp = unix_timestamp;
+    svm.set_sysvar(&clock);
+}
+
 /// Deposits `amount` USDC into the LP pool from a freshly-funded depositor. Used
 /// both to seed a market's initial TVL-scaled caps before `initialize_market`,
 /// and to fund the pool so `debit` has something to pay out from.
@@ -439,6 +463,19 @@ pub fn make_liquidate_ix(
             liquidator_usdc_ata,
             usdc_mint,
             token_program: anchor_spl::token::ID,
+        }
+        .to_account_metas(None),
+    )
+}
+
+pub fn make_update_funding_ix(program_id: Pubkey, signer: Pubkey, market: Pubkey) -> Instruction {
+    Instruction::new_with_bytes(
+        program_id,
+        &perp::instruction::UpdateFunding {}.data(),
+        perp::accounts::UpdateFunding {
+            signer,
+            market,
+            system_program: system_program::ID,
         }
         .to_account_metas(None),
     )

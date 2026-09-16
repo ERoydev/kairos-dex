@@ -1,0 +1,6 @@
+
+signer "payer" "svm::secret_key" {
+    description = "Pays fees and signs admin init instructions"
+    keypair_json = "~/.config/solana/id.json"
+    // See documentation for other options (mnemonic, etc): https://docs.surfpool.run/iac/svm/signers
+}
