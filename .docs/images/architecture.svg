@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 860" font-family="'JetBrains Mono','Fira Code',Menlo,Consolas,monospace">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0e17"/>
+      <stop offset="100%" stop-color="#141a2e"/>
+    </linearGradient>
+
+    <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="1.2" cy="1.2" r="1.2" fill="#67e8f9" opacity="0.10"/>
+    </pattern>
+
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="glowSoft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <marker id="arrowCyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#67e8f9"/>
+    </marker>
+    <marker id="arrowViolet" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a5b4fc"/>
+    </marker>
+    <marker id="arrowMagenta" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f0abfc"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#86efac"/>
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#fbbf24"/>
+    </marker>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="1200" height="860" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1200" height="860" fill="url(#dots)"/>
+  <rect x="12" y="12" width="1176" height="836" rx="18" fill="none" stroke="#22d3ee" stroke-opacity="0.25" stroke-width="1.5"/>
+
+  <!-- title -->
+  <text x="44" y="52" font-size="26" font-weight="700" fill="#67e8f9" filter="url(#glowSoft)" letter-spacing="2">KAIROS DEX</text>
+  <text x="44" y="74" font-size="13" fill="#64748b" letter-spacing="1">ON-CHAIN / OFF-CHAIN ARCHITECTURE</text>
+
+  <!-- legend -->
+  <g font-size="11" fill="#94a3b8">
+    <circle cx="790" cy="38" r="5" fill="#22d3ee"/><text x="802" y="42">client</text>
+    <circle cx="870" cy="38" r="5" fill="#a5b4fc"/><text x="882" y="42">on-chain program</text>
+    <circle cx="1010" cy="38" r="5" fill="#f0abfc"/><text x="1022" y="42">off-chain service</text>
+    <circle cx="790" cy="62" r="5" fill="#86efac"/><text x="802" y="66">keeper bot</text>
+    <circle cx="900" cy="62" r="5" fill="none" stroke="#94a3b8" stroke-dasharray="3,2"/><text x="912" y="66">mirror store</text>
+  </g>
+
+  <!-- ===== connectors (drawn first, under nodes) ===== -->
+
+  <!-- wallet -> perp -->
+  <line x1="590" y1="184" x2="590" y2="238" stroke="#67e8f9" stroke-width="2" marker-end="url(#arrowCyan)" filter="url(#glow)"/>
+  <rect x="524" y="196" width="132" height="20" rx="4" fill="#0a0e17"/>
+  <text x="590" y="210" font-size="11" fill="#67e8f9" text-anchor="middle">sign &amp; send</text>
+
+  <!-- perp <-CPI-> lp pool -->
+  <line x1="742" y1="290" x2="838" y2="290" stroke="#fbbf24" stroke-width="2.5" marker-end="url(#arrowAmber)" marker-start="url(#arrowAmber)" filter="url(#glow)"/>
+  <rect x="748" y="266" width="84" height="20" rx="4" fill="#0a0e17"/>
+  <text x="790" y="280" font-size="11" fill="#fbbf24" text-anchor="middle">CPI</text>
+
+  <!-- perp -> webhook -->
+  <line x1="590" y1="342" x2="590" y2="398" stroke="#a5b4fc" stroke-width="2" marker-end="url(#arrowViolet)" filter="url(#glow)"/>
+  <rect x="500" y="358" width="180" height="20" rx="4" fill="#0a0e17"/>
+  <text x="590" y="372" font-size="11" fill="#a5b4fc" text-anchor="middle">on-chain events</text>
+
+  <!-- lp pool -> webhook -->
+  <line x1="900" y1="342" x2="744" y2="428" stroke="#a5b4fc" stroke-width="1.5" stroke-opacity="0.6" marker-end="url(#arrowViolet)"/>
+
+  <!-- webhook -> indexer -->
+  <line x1="590" y1="476" x2="590" y2="518" stroke="#f0abfc" stroke-width="2" marker-end="url(#arrowMagenta)" filter="url(#glow)"/>
+  <rect x="514" y="486" width="152" height="20" rx="4" fill="#0a0e17"/>
+  <text x="590" y="500" font-size="11" fill="#f0abfc" text-anchor="middle">HTTP webhook</text>
+
+  <!-- indexer -> postgres -->
+  <line x1="590" y1="596" x2="590" y2="638" stroke="#f0abfc" stroke-width="2" marker-end="url(#arrowMagenta)" filter="url(#glow)"/>
+  <rect x="558" y="606" width="66" height="20" rx="4" fill="#0a0e17"/>
+  <text x="590" y="620" font-size="11" fill="#f0abfc" text-anchor="middle">writes</text>
+
+  <!-- kairos-api -> postgres (reads) -->
+  <line x1="838" y1="687" x2="744" y2="686" stroke="#f0abfc" stroke-width="2" marker-end="url(#arrowMagenta)" filter="url(#glow)"/>
+  <rect x="756" y="663" width="60" height="20" rx="4" fill="#0a0e17"/>
+  <text x="786" y="677" font-size="11" fill="#f0abfc" text-anchor="middle">reads</text>
+
+  <!-- kairos-api -> frontend -->
+  <line x1="990" y1="648" x2="990" y2="596" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrowCyan)" filter="url(#glow)"/>
+  <rect x="954" y="612" width="72" height="20" rx="4" fill="#0a0e17"/>
+  <text x="990" y="626" font-size="11" fill="#22d3ee" text-anchor="middle">JSON</text>
+
+  <!-- keeper -> perp (long curve) -->
+  <path d="M 440 800 C 150 800 150 290 438 290" fill="none" stroke="#86efac" stroke-width="2" marker-end="url(#arrowGreen)" filter="url(#glow)"/>
+  <g transform="translate(150,545) rotate(-90)">
+    <rect x="-98" y="-11" width="196" height="22" rx="4" fill="#0a0e17"/>
+    <text x="0" y="5" font-size="11" fill="#86efac" text-anchor="middle">liquidate / update_funding (poll)</text>
+  </g>
+
+  <!-- ===== nodes ===== -->
+
+  <!-- Wallet -->
+  <g filter="url(#glow)">
+    <rect x="440" y="110" width="300" height="74" rx="14" fill="#0f1424" stroke="#22d3ee" stroke-width="2"/>
+  </g>
+  <text x="590" y="140" font-size="15" font-weight="700" fill="#e0f7fa" text-anchor="middle">TRADER / LP WALLET</text>
+  <text x="590" y="160" font-size="11" fill="#7dd3fc" text-anchor="middle">signs &amp; sends transactions directly</text>
+
+  <!-- Perp Program -->
+  <g filter="url(#glow)">
+    <rect x="440" y="240" width="300" height="100" rx="14" fill="#131a30" stroke="#a5b4fc" stroke-width="2"/>
+  </g>
+  <text x="590" y="275" font-size="16" font-weight="700" fill="#eef2ff" text-anchor="middle">PERP PROGRAM</text>
+  <text x="590" y="296" font-size="11" fill="#c7d2fe" text-anchor="middle">markets · positions</text>
+  <text x="590" y="312" font-size="11" fill="#c7d2fe" text-anchor="middle">funding · liquidation</text>
+
+  <!-- LP Pool Program -->
+  <g filter="url(#glow)">
+    <rect x="840" y="240" width="300" height="100" rx="14" fill="#131a30" stroke="#a5b4fc" stroke-width="2"/>
+  </g>
+  <text x="990" y="275" font-size="16" font-weight="700" fill="#eef2ff" text-anchor="middle">LP POOL PROGRAM</text>
+  <text x="990" y="296" font-size="11" fill="#c7d2fe" text-anchor="middle">depositor vault</text>
+  <text x="990" y="312" font-size="11" fill="#c7d2fe" text-anchor="middle">credit / debit on settle</text>
+
+  <!-- Helius Webhook -->
+  <g filter="url(#glow)">
+    <rect x="440" y="400" width="300" height="74" rx="14" fill="#1a1128" stroke="#f0abfc" stroke-width="2"/>
+  </g>
+  <text x="590" y="430" font-size="15" font-weight="700" fill="#fdf4ff" text-anchor="middle">HELIUS WEBHOOK</text>
+  <text x="590" y="450" font-size="11" fill="#f5d0fe" text-anchor="middle">watches program addresses</text>
+
+  <!-- kairos-indexer -->
+  <g filter="url(#glow)">
+    <rect x="440" y="520" width="300" height="74" rx="14" fill="#1a1128" stroke="#f0abfc" stroke-width="2"/>
+  </g>
+  <text x="590" y="550" font-size="15" font-weight="700" fill="#fdf4ff" text-anchor="middle">KAIROS-INDEXER</text>
+  <text x="590" y="570" font-size="11" fill="#f5d0fe" text-anchor="middle">decode → write (write-only)</text>
+
+  <!-- Postgres (mirror, dashed) -->
+  <g filter="url(#glow)">
+    <rect x="440" y="640" width="300" height="90" rx="14" fill="#1a1128" stroke="#f0abfc" stroke-width="2" stroke-dasharray="7,5"/>
+  </g>
+  <text x="590" y="674" font-size="15" font-weight="700" fill="#fdf4ff" text-anchor="middle">POSTGRES</text>
+  <text x="590" y="694" font-size="11" fill="#f5d0fe" text-anchor="middle">mirror of on-chain state</text>
+  <text x="590" y="710" font-size="11" fill="#f5d0fe" text-anchor="middle">never authoritative</text>
+
+  <!-- kairos-api -->
+  <g filter="url(#glow)">
+    <rect x="840" y="650" width="300" height="74" rx="14" fill="#1a1128" stroke="#f0abfc" stroke-width="2"/>
+  </g>
+  <text x="990" y="680" font-size="15" font-weight="700" fill="#fdf4ff" text-anchor="middle">KAIROS-API</text>
+  <text x="990" y="700" font-size="11" fill="#f5d0fe" text-anchor="middle">read-only (positions, PnL, stats)</text>
+
+  <!-- Frontend -->
+  <g filter="url(#glow)">
+    <rect x="840" y="520" width="300" height="74" rx="14" fill="#0f1424" stroke="#22d3ee" stroke-width="2"/>
+  </g>
+  <text x="990" y="550" font-size="15" font-weight="700" fill="#e0f7fa" text-anchor="middle">FRONTEND</text>
+  <text x="990" y="570" font-size="11" fill="#7dd3fc" text-anchor="middle">trades &amp; deposits still go direct on-chain</text>
+
+  <!-- kairos-keeper -->
+  <g filter="url(#glow)">
+    <rect x="440" y="760" width="300" height="80" rx="14" fill="#0f1f16" stroke="#86efac" stroke-width="2"/>
+  </g>
+  <text x="590" y="792" font-size="15" font-weight="700" fill="#ecfdf3" text-anchor="middle">KAIROS-KEEPER</text>
+  <text x="590" y="812" font-size="11" fill="#bbf7d0" text-anchor="middle">permissionless liquidation &amp; funding bot</text>
+</svg>
