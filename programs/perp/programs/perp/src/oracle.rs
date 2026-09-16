@@ -51,9 +51,9 @@ impl<'a, 'info> OracleAdapter<'a, 'info> {
         }
     }
 
-    pub fn read_price_guarded(&self, clock: &Clock) -> Result<MicroUsdc> {
+    pub fn read_price_guarded(&self) -> Result<MicroUsdc> {
         let price = self.price_account.get_price_no_older_than(
-            clock,
+            &Clock::get()?,
             self.config.max_staleness_secs as u64,
             self.feed_id,
         )?;

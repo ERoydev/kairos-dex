@@ -24,7 +24,7 @@ pub fn _liquidate(ctx: Context<Liquidate>) -> Result<()> {
     let feed_id: [u8; 32] = get_feed_id_from_hex(&market.feed_id)?;
     let oracle_guard = OracleAdapter::new(&ctx.accounts.price_update, &feed_id);
     let exit_price: MicroUsdc = oracle_guard
-        .read_price_guarded(&Clock::get()?)
+        .read_price_guarded()
         .map_err(|_| PerpError::OracleGuardReadFailed)?;
 
     // Settle funding accrued since the position was opened

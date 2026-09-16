@@ -36,7 +36,7 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
     let feed_id: [u8; 32] = get_feed_id_from_hex(&market.feed_id)?;
     let oracle_guard = OracleAdapter::new(&ctx.accounts.price_update, &feed_id);
     let asset_price: MicroUsdc = oracle_guard
-        .read_price_guarded(&Clock::get()?)
+        .read_price_guarded()
         .map_err(|_| PerpError::OracleGuardReadFailed)?;
 
     // Position_size
