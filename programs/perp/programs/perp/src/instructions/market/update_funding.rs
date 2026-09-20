@@ -1,11 +1,14 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    alliases::MicroUsdc, events::FundingUpdated, syntetic_market::SynteticMarket, PerpError,
+    alliases::MicroUsdc, events::FundingUpdated, syntetic_market::SynteticMarket,
+    utils::caps::max_skew, PerpError,
 };
+use liquidity_pool::Pool;
 
 /// Update the comulative_funding_index, invoked from `perp-keeper` bot. (Permissionless)
 pub fn _update_funding(ctx: Context<UpdateFunding>) -> Result<()> {
+    let lp_tvl = ctx.accounts.lp_pool.total_assets;
     let market = &mut ctx.accounts.market;
 
     let now = Clock::get()?.unix_timestamp;
@@ -16,11 +19,12 @@ pub fn _update_funding(ctx: Context<UpdateFunding>) -> Result<()> {
     );
 
     // 1. Compute skew_ratio = (oi_long - oi_short) / max_skew.
-    let skew_ratio_bps = UpdateFunding::compute_skew_ratio_bps(
-        market.oi_long,
-        market.oi_short,
-        market.risk_management.caps.max_skew,
-    );
+    // Funding is asset-specific (it exists to pull *this* market's book back toward
+    // balance), so it stays keyed off this market's own oi_long/oi_short — unlike the
+    // pool-solvency skew cap in `open_position`, which has to look at the aggregate
+    // across every market.
+    let skew_ratio_bps =
+        UpdateFunding::compute_skew_ratio_bps(market.oi_long, market.oi_short, max_skew(lp_tvl));
 
     // 2. Compute funding_rate = skew_ratio × sensitivity_bps, clamped.
     let funding_rate_bps: i64 = UpdateFunding::compute_funding_rate(
@@ -51,6 +55,9 @@ pub struct UpdateFunding<'info> {
 
     #[account(mut)]
     pub market: Account<'info, SynteticMarket>,
+
+    pub lp_pool: Account<'info, Pool>,
+
     pub system_program: Program<'info, System>,
 }
 

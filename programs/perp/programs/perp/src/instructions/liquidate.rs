@@ -7,11 +7,12 @@ use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2
 use crate::{
     alliases::MicroUsdc,
     events::PositionLiquidated,
+    global::GlobalConfig,
     position::{Position, PositionType},
     syntetic_market::SynteticMarket,
     utils::pnl::{apply_funding, calculate_pnl},
-    OracleAdapter, PerpError, BAD_DEBT_KEEPER_REWARD_BPS, INSURANCE_FUND_VAULT, MARKET_VAULT,
-    POSITION_SEED,
+    OracleAdapter, PerpError, BAD_DEBT_KEEPER_REWARD_BPS, GLOBAL_SEED, INSURANCE_FUND_VAULT,
+    MARKET_VAULT, POSITION_SEED,
 };
 
 // Anyone can call this (permissionless keeper). No trade fee is charged here —
@@ -99,10 +100,17 @@ pub fn _liquidate(ctx: Context<Liquidate>) -> Result<()> {
     let trader_key = ctx.accounts.trader.key();
     let liquidator_key = ctx.accounts.liquidator.key();
     let market = &mut ctx.accounts.market;
+    let global_config = &mut ctx.accounts.global_config;
 
     match side {
-        PositionType::Long => market.oi_long -= notional,
-        PositionType::Short => market.oi_short -= notional,
+        PositionType::Long => {
+            market.oi_long -= notional;
+            global_config.total_oi_long -= notional;
+        }
+        PositionType::Short => {
+            market.oi_short -= notional;
+            global_config.total_oi_short -= notional;
+        }
     }
 
     emit!(PositionLiquidated {
@@ -129,6 +137,13 @@ pub struct Liquidate<'info> {
     pub trader: UncheckedAccount<'info>,
 
     pub price_update: Box<Account<'info, PriceUpdateV2>>,
+
+    #[account(
+        mut,
+        seeds = [GLOBAL_SEED],
+        bump = global_config.bump,
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
 
     // Seeds bind this account to `trader` and `market`, so a mismatched trader or
     // market simply fails PDA derivation — no extra ownership check needed.

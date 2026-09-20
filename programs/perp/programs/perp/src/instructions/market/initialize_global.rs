@@ -21,6 +21,8 @@ pub fn _initialize_global(
     config.max_markets = max_markets;
     config.markets_count = 0;
     config.bump = ctx.bumps.global_config;
+    config.total_oi_long = 0;
+    config.total_oi_short = 0;
 
     emit!(GlobalInitialized {
         authority: ctx.accounts.payer.key(),

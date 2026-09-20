@@ -103,7 +103,6 @@ fn test_initialize_market_ok() {
         market,
         vault,
         insurance_fund_vault,
-        env.lp_pool,
         oracle,
         env.usdc_mint,
         sym,
@@ -142,13 +141,6 @@ fn test_initialize_market_ok() {
         data.risk_management.fee_schedule.skew_fee_max_bps,
         SKEW_FEE_MAX_BPS
     );
-    // setup()'s lp_pool has no deposits, so total_assets == 0 and every TVL-scaled cap is 0.
-    assert_eq!(data.risk_management.caps.max_position_notional, 0);
-    assert_eq!(data.risk_management.caps.max_user_notional, 0);
-    assert_eq!(data.risk_management.caps.max_oi_long, 0);
-    assert_eq!(data.risk_management.caps.max_oi_short, 0);
-    assert_eq!(data.risk_management.caps.max_skew, 0);
-
     assert_eq!(data.funding_config.sensitivity_bps, SENSITIVITY_BPS);
     assert_eq!(data.funding_config.max_rate_bps, MAX_RATE_BPS);
     assert_eq!(data.funding_config.interval_seconds, INTERVAL_SECONDS);
@@ -177,7 +169,6 @@ fn test_initialize_market_rejects_non_admin() {
         market,
         vault,
         insurance_fund_vault,
-        env.lp_pool,
         oracle,
         env.usdc_mint,
         sym,
@@ -205,7 +196,6 @@ fn test_initialize_market_rejects_zero_leverage() {
         market,
         vault,
         insurance_fund_vault,
-        env.lp_pool,
         oracle,
         env.usdc_mint,
         sym,
@@ -229,7 +219,6 @@ fn test_initialize_market_rejects_default_oracle() {
         market,
         vault,
         insurance_fund_vault,
-        env.lp_pool,
         Pubkey::default(),
         env.usdc_mint,
         sym,

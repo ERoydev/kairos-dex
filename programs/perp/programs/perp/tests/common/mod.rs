@@ -26,9 +26,8 @@ use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
 
 use perp::{
-    state::syntetic_market::{SynteticMarket, TvlScaledCaps},
-    OpenPositionParams, SMParams, GLOBAL_SEED, INSURANCE_FUND_VAULT, MARKET_SEED, MARKET_VAULT,
-    POSITION_SEED,
+    state::syntetic_market::SynteticMarket, OpenPositionParams, SMParams, GLOBAL_SEED,
+    INSURANCE_FUND_VAULT, MARKET_SEED, MARKET_VAULT, POSITION_SEED,
 };
 
 pub const USDC_DECIMALS: u8 = 6;
@@ -84,20 +83,6 @@ pub fn pool_total_assets(svm: &LiteSVM, pool: &Pubkey) -> u64 {
     liquidity_pool::Pool::try_deserialize(&mut svm.get_account(pool).unwrap().data.as_slice())
         .unwrap()
         .total_assets
-}
-
-/// Overwrites a market's risk caps directly, bypassing whatever TVL they were
-/// seeded with at `initialize_market` time. Used by tests that need caps wide
-/// enough to exercise the fee-split / PnL paths without a large LP deposit.
-pub fn widen_market_caps(svm: &mut LiteSVM, market: &Pubkey, caps: TvlScaledCaps) {
-    let mut account = svm.get_account(market).expect("market not found");
-    let mut data = SynteticMarket::try_deserialize(&mut account.data.as_slice()).unwrap();
-    data.risk_management.caps = caps;
-
-    let mut new_data = Vec::new();
-    data.try_serialize(&mut new_data).unwrap();
-    account.data = new_data;
-    svm.set_account(*market, account).unwrap();
 }
 
 /// Overwrites a market's `oi_long`/`oi_short` directly, bypassing `open_position`.
@@ -257,7 +242,6 @@ pub fn make_initialize_market_ix(
     market: Pubkey,
     vault: Pubkey,
     insurance_fund_vault: Pubkey,
-    lp_pool: Pubkey,
     oracle: Pubkey,
     usdc_mint: Pubkey,
     sym: [u8; 16],
@@ -276,26 +260,12 @@ pub fn make_initialize_market_ix(
             market,
             vault,
             insurance_fund_vault,
-            lp_pool,
             oracle,
             usdc_mint,
             token_program: anchor_spl::token::ID,
             system_program: system_program::ID,
         }
         .to_account_metas(None),
-    )
-}
-
-pub fn make_update_caps_ix(
-    program_id: Pubkey,
-    authority: Pubkey,
-    market: Pubkey,
-    params: perp::instruction::UpdateCaps,
-) -> Instruction {
-    Instruction::new_with_bytes(
-        program_id,
-        &params.data(),
-        perp::accounts::UpdateCaps { authority, market }.to_account_metas(None),
     )
 }
 
