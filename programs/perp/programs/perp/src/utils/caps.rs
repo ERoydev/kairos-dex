@@ -1,24 +1,32 @@
-use crate::{alliases::MicroUsdc, syntetic_market::TvlScaledCaps};
+use crate::alliases::MicroUsdc;
 
 // TODO: Re-adjust, research which are the best constants for these properties
 const MAX_POSITION_NOTIONAL_BPS: u64 = 100; // 1% of TVL
-const MAX_USER_NOTIONAL_BPS: u64 = 300; // 3% of TVL
 const MAX_OI_SIDE_BPS: u64 = 4_000; // 40% of TVL
 const MAX_SKEW_BPS: u64 = 2_000; // 20% of TVL
 
-/// Used on Market initialization
-pub fn compute_caps(lp_tvl: MicroUsdc) -> TvlScaledCaps {
-    // ANCHOR: The problem is that these values are computed once on initialize market, so after initialization lp_tvl changes and these value should change too
-    TvlScaledCaps {
-        max_position_notional: scale(lp_tvl, MAX_POSITION_NOTIONAL_BPS),
-        max_user_notional: scale(lp_tvl, MAX_USER_NOTIONAL_BPS),
-        max_oi_long: scale(lp_tvl, MAX_OI_SIDE_BPS),
-        max_oi_short: scale(lp_tvl, MAX_OI_SIDE_BPS),
-        max_skew: scale(lp_tvl, MAX_SKEW_BPS),
-    }
+/// These are never stored — the shared LP pool's TVL moves every deposit/withdraw/trade,
+/// so a cap computed from it and then cached on a market account goes stale the moment
+/// TVL changes again. Instead every check calls these live, off whatever `lp_pool.total_assets`
+/// is at that instant. No bot, no admin resync instruction, no staleness window.
+pub fn max_position_notional(lp_tvl: MicroUsdc) -> MicroUsdc {
+    scale(lp_tvl, MAX_POSITION_NOTIONAL_BPS)
 }
 
+pub fn max_oi_long(lp_tvl: MicroUsdc) -> MicroUsdc {
+    scale(lp_tvl, MAX_OI_SIDE_BPS)
+}
 
+pub fn max_oi_short(lp_tvl: MicroUsdc) -> MicroUsdc {
+    scale(lp_tvl, MAX_OI_SIDE_BPS)
+}
+
+/// Bounds *aggregate* skew across every market (see `GlobalConfig::total_oi_long/short`),
+/// not a single market's — skew is net directional liability the shared pool carries in
+/// USDC, and that sums across markets regardless of which one it came from.
+pub fn max_skew(lp_tvl: MicroUsdc) -> MicroUsdc {
+    scale(lp_tvl, MAX_SKEW_BPS)
+}
 
 fn scale(tvl: MicroUsdc, bps: u64) -> MicroUsdc {
     (tvl as u128 * bps as u128 / 10_000) as u64

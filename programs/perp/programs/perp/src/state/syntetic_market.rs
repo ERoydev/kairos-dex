@@ -71,17 +71,10 @@ pub struct RiskManagementParameters {
     pub max_leverage: u16,
     pub maintenance_margin_bps: u16, // MMR, liquidation threshold
     pub fee_schedule: FeeSchedule,   // base fees + skew curve
-    pub caps: TvlScaledCaps,
-}
-
-#[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize, Debug)]
-/// Those get updated, when TVL in the pool grows or shrinks
-pub struct TvlScaledCaps {
-    pub max_position_notional: MicroUsdc, // single position size cap -> 100,000 for example means, a Position cannot exceed this in USDC
-    pub max_user_notional: MicroUsdc, // cap on the sum of all one user's positions in that market.
-    pub max_oi_long: MicroUsdc,       // gross open interest caps per side
-    pub max_oi_short: MicroUsdc,
-    pub max_skew: MicroUsdc, // net directional cap, 20% of Total Value Locked in LP Pool
+                                     // TVL-scaled caps (max_position_notional, max_oi_long/short, max_skew) are no
+                                     // longer stored here — they're derived live from `lp_pool.total_assets` at
+                                     // check time via `utils::caps`, so they can never go stale relative to the
+                                     // pool's actual TVL. See `utils::caps` for the computation.
 }
 
 #[derive(Clone, InitSpace, AnchorSerialize, AnchorDeserialize, Debug)]

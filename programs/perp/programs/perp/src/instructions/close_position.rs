@@ -14,7 +14,7 @@ use crate::{
         fee_model::FeeModel,
         pnl::{apply_funding, calculate_pnl, settle},
     },
-    OracleAdapter, PerpError, MARKET_VAULT, POSITION_SEED,
+    OracleAdapter, PerpError, GLOBAL_SEED, MARKET_VAULT, POSITION_SEED,
 };
 
 use liquidity_pool::Pool;
@@ -98,9 +98,16 @@ pub fn _close_position(ctx: Context<ClosePosition>) -> Result<()> {
     let trader_key = ctx.accounts.trader.key();
 
     let market = &mut ctx.accounts.market;
+    let global_config = &mut ctx.accounts.global_config;
     match side {
-        PositionType::Long => market.oi_long -= notional,
-        PositionType::Short => market.oi_short -= notional,
+        PositionType::Long => {
+            market.oi_long -= notional;
+            global_config.total_oi_long -= notional;
+        }
+        PositionType::Short => {
+            market.oi_short -= notional;
+            global_config.total_oi_short -= notional;
+        }
     }
 
     emit!(PositionClosed {
@@ -123,6 +130,11 @@ pub struct ClosePosition<'info> {
     pub price_update: Box<Account<'info, PriceUpdateV2>>,
 
     // --- Perp accounts
+    #[account(
+        mut,
+        seeds = [GLOBAL_SEED],
+        bump = global_config.bump,
+    )]
     pub global_config: Account<'info, GlobalConfig>,
 
     // Seeds already bind this account to `trader` and `market`, so a mismatched

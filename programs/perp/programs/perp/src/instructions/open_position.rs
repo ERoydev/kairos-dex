@@ -10,8 +10,8 @@ use crate::{
     global::GlobalConfig,
     position::{Position, PositionType},
     syntetic_market::SynteticMarket,
-    utils::{fee_model::FeeModel, skew::Skew},
-    OracleAdapter, PerpError, MARKET_VAULT, POSITION_SEED,
+    utils::{caps, fee_model::FeeModel, skew::Skew},
+    OracleAdapter, PerpError, GLOBAL_SEED, MARKET_VAULT, POSITION_SEED,
 };
 
 // This imports the credit function and Credit accounts struct from liquidity-pool
@@ -45,19 +45,25 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
         .checked_mul(o_params.leverage.into())
         .ok_or(PerpError::MathOverflow)?;
 
-    // Observe imbalances that this trade can cause
+    // Caps are computed live off the shared pool's current TVL — never stored,
+    // never stale. See `utils::caps`.
+    let lp_tvl = ctx.accounts.lp_pool.total_assets;
+    let max_skew = caps::max_skew(lp_tvl);
+
+    // Skew (and the OI caps below) are checked against the *aggregate* across every
+    // market, not this market's own oi_long/oi_short — they all draw on the same
+    // shared pool, so a per-market check would let each market independently claim
+    // the same capacity. See `GlobalConfig::total_oi_long/short`.
+    let global_config = &ctx.accounts.global_config;
     let skew_model = Skew::new(
-        &market.oi_long,
-        &market.oi_short,
+        &global_config.total_oi_long,
+        &global_config.total_oi_short,
         &notional_before_fee,
         is_long,
     );
     let projected_skew = skew_model.projected_skew();
     // TODO: This require should be done after we got the final position_size after fees, but i leave it there until i refactor the code to avoid dublication
-    require!(
-        market.risk_management.caps.max_skew > projected_skew,
-        PerpError::MaxSkewLimitExceeded
-    );
+    require!(max_skew > projected_skew, PerpError::MaxSkewLimitExceeded);
 
     let worsens_skew = skew_model.worsens_skew();
 
@@ -66,7 +72,7 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
         &notional_before_fee,
         fee_schedule,
         Some(&projected_skew),
-        Some(&market.risk_management.caps.max_skew),
+        Some(&max_skew),
     );
     let fee_to_pay = fee_model.calculate_trade_fee(worsens_skew)?;
 
@@ -79,20 +85,21 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
         .checked_mul(o_params.leverage.into())
         .ok_or(PerpError::MathOverflow)?;
 
-    // Cap: single position notional
+    // Cap: single position notional — a per-trade ceiling, no running total to
+    // aggregate, so this one just needs the live TVL, nothing from global_config.
     require!(
-        position_size <= market.risk_management.caps.max_position_notional,
+        position_size <= caps::max_position_notional(lp_tvl),
         PerpError::PositionExceedsMaxNotional
     );
 
-    // Cap: gross open interest for this side
+    // Cap: gross open interest for this side, aggregated across every market
     let (new_oi, oi_cap) = SynteticMarket::calc_open_interest(
         is_long,
         position_size,
-        market.oi_long,
-        market.oi_short,
-        market.risk_management.caps.max_oi_long,
-        market.risk_management.caps.max_oi_short,
+        global_config.total_oi_long,
+        global_config.total_oi_short,
+        caps::max_oi_long(lp_tvl),
+        caps::max_oi_short(lp_tvl),
     )?;
     require!(new_oi <= oi_cap, PerpError::OpenInterestCapExceeded);
 
@@ -131,11 +138,19 @@ pub fn _open_position(ctx: Context<OpenPosition>, o_params: OpenPositionParams) 
     position.opened_at = Clock::get()?.unix_timestamp;
     position.entry_funding_index_bps = entry_funding_index_bps;
 
-    // Update Market open interest
+    // Update this market's own OI (used for its funding rate) and the global
+    // aggregate (used for pool-solvency caps) together, so they never drift apart.
     let market = &mut ctx.accounts.market;
+    let global_config = &mut ctx.accounts.global_config;
     match o_params.position_type {
-        PositionType::Long => market.oi_long += position_size,
-        PositionType::Short => market.oi_short += position_size,
+        PositionType::Long => {
+            market.oi_long += position_size;
+            global_config.total_oi_long += position_size;
+        }
+        PositionType::Short => {
+            market.oi_short += position_size;
+            global_config.total_oi_short += position_size;
+        }
     }
 
     emit!(PositionOpened {
@@ -164,6 +179,14 @@ pub struct OpenPosition<'info> {
     pub price_update: Box<Account<'info, PriceUpdateV2>>,
 
     // --- Perp accounts
+    // `mut` + seeds-validated: this is now written to on every trade (aggregate OI
+    // used by the pool-solvency caps), so it must be the canonical PDA, not just
+    // any GlobalConfig-typed account the caller hands in.
+    #[account(
+        mut,
+        seeds = [GLOBAL_SEED],
+        bump = global_config.bump,
+    )]
     pub global_config: Account<'info, GlobalConfig>,
 
     #[account(
