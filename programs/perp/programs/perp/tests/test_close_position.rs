@@ -28,7 +28,7 @@ use solana_signer::Signer;
 use perp::{
     state::{
         position::PositionType,
-        syntetic_market::{SynteticMarket, TvlScaledCaps},
+        syntetic_market::{SynteticMarket},
     },
     OpenPositionParams, SMParams,
 };
@@ -52,6 +52,27 @@ struct Env {
     trader_usdc_ata: Pubkey,
     fee_receiver_ata: Pubkey,
     payer: Keypair,
+}
+
+/// Widens the live TVL-derived caps (utils::caps) so a trade actually produces
+/// a non-zero fee. Caps scale off a single lp_pool.total_assets by fixed
+/// ratios (max_skew = 20x max_position_notional, max_oi = 40x), so a `target`
+/// of 1_000_000_000 gives max_position_notional=10_000_000, max_skew=
+/// 200_000_000, max_oi_long/short=400_000_000 — see test_open_position.rs's
+/// `test_open_position_distributes_fees` for the full fee derivation these
+/// tests share. Callers that also `fund_pool` afterward pass a lower target so
+/// the tvl at open_position time still lands on exactly 1_000_000_000.
+fn widen_caps_to(env: &mut Env, target: u64) {
+    widen_lp_pool_tvl(
+        &mut env.svm,
+        &env.payer,
+        env.lp_program_id,
+        env.usdc_mint,
+        env.lp_pool,
+        env.lp_pool_usdc_vault,
+        env.lp_mint,
+        target,
+    );
 }
 
 fn setup() -> Env {
@@ -127,7 +148,6 @@ fn setup() -> Env {
         market,
         market_vault,
         insurance_fund_vault,
-        lp_pool,
         oracle,
         usdc_mint,
         sym,
@@ -301,21 +321,11 @@ fn test_close_position_breakeven() {
 #[test]
 fn test_close_position_full_loss_credits_pool() {
     let mut env = setup();
-    widen_market_caps(
-        &mut env.svm,
-        &env.market,
-        TvlScaledCaps {
-            max_position_notional: 1_000_000_000,
-            max_user_notional: 1_000_000_000,
-            max_oi_long: 1_000_000_000,
-            max_oi_short: 1_000_000_000,
-            max_skew: 20_000_000,
-        },
-    );
+    widen_caps_to(&mut env, 1_000_000_000);
     let open_price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
 
-    // margin=1_000_000, leverage=10 -> open fee 20_000 (base+skew), collateral 980_000,
-    // notional 9_800_000. Matches test_open_position_distributes_fees's math.
+    // margin=1_000_000, leverage=10 -> open fee 11_000 (base+skew), collateral 989_000,
+    // notional 9_890_000. Matches test_open_position_distributes_fees's math.
     let position = open(
         &mut env,
         open_price_update,
@@ -328,9 +338,9 @@ fn test_close_position_full_loss_credits_pool() {
         },
     );
 
-    // close_fee = 10bps of notional 9_800_000 = 9_800 -> protocol 1_470 / lp 8_330.
-    // collateral_after_fee = 980_000 - 9_800 = 970_200.
-    // -10% move: pnl = -10_000_000/100_000_000 * 9_800_000 = -980_000, which wipes
+    // close_fee = 10bps of notional 9_890_000 = 9_890 -> protocol 1_483 / lp 8_407.
+    // collateral_after_fee = 989_000 - 9_890 = 979_110.
+    // -10% move: pnl = -10_000_000/100_000_000 * 9_890_000 = -989_000, which wipes
     // out even the pre-fee collateral, so payout=0 and the pool eats the rest.
     let close_price_update = fabricate_price_update(&mut env.svm, 90_00_000_000); // $90.00
 
@@ -358,17 +368,17 @@ fn test_close_position_full_loss_credits_pool() {
     let res = send_ix(&mut env.svm, close_ix, &[&env.trader]);
     assert!(res.is_ok(), "close_position failed: {:?}", res.err());
 
-    let expected_protocol_fee = 1_470u64;
-    let expected_lp_fee = 8_330u64;
-    let expected_credit_to_pool = 970_200u64;
+    let expected_protocol_fee = 1_483u64;
+    let expected_lp_fee = 8_407u64;
+    let expected_credit_to_pool = 979_110u64;
 
     // Trader receives nothing.
     assert_eq!(token_balance(&env.svm, &env.trader_usdc_ata), trader_before);
-    // Vault drains by exactly the position's remaining collateral (980_000 total:
+    // Vault drains by exactly the position's remaining collateral (989_000 total:
     // fee split + full loss credit), leaving no leftover or shortfall.
     assert_eq!(
         vault_before - token_balance(&env.svm, &env.market_vault),
-        980_000
+        989_000
     );
     assert_eq!(
         token_balance(&env.svm, &env.fee_receiver_ata) - fee_receiver_before,
@@ -392,18 +402,10 @@ fn test_close_position_full_loss_credits_pool() {
 #[test]
 fn test_close_position_profit_funded_by_pool() {
     let mut env = setup();
-    widen_market_caps(
-        &mut env.svm,
-        &env.market,
-        TvlScaledCaps {
-            max_position_notional: 1_000_000_000,
-            max_user_notional: 1_000_000_000,
-            max_oi_long: 1_000_000_000,
-            max_oi_short: 1_000_000_000,
-            max_skew: 20_000_000,
-        },
-    );
-    // Seed the pool with enough liquidity to cover the payout below (980_000).
+    // Widen to 995_000_000 now so the extra 5_000_000 seeded by fund_pool below
+    // lands the tvl at open_position time on exactly 1_000_000_000.
+    widen_caps_to(&mut env, 995_000_000);
+    // Seed the pool with enough liquidity to cover the payout below (989_000).
     fund_pool(&mut env, 5_000_000);
 
     let open_price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
@@ -419,10 +421,10 @@ fn test_close_position_profit_funded_by_pool() {
         },
     );
 
-    // close_fee = 9_800 -> protocol 1_470 / lp 8_330. collateral_after_fee = 970_200.
-    // +10% move: pnl = +980_000. net = 970_200 + 980_000 = 1_950_200, which exceeds
-    // collateral_after_fee, so debit_from_pool = 1_950_200 - 970_200 = 980_000 and
-    // the vault only ever pays out its own 970_200 share.
+    // close_fee = 9_890 -> protocol 1_483 / lp 8_407. collateral_after_fee = 979_110.
+    // +10% move: pnl = +989_000. net = 979_110 + 989_000 = 1_968_110, which exceeds
+    // collateral_after_fee, so debit_from_pool = 1_968_110 - 979_110 = 989_000 and
+    // the vault only ever pays out its own 979_110 share.
     let close_price_update = fabricate_price_update(&mut env.svm, 110_00_000_000); // $110.00
 
     let trader_before = token_balance(&env.svm, &env.trader_usdc_ata);
@@ -449,14 +451,14 @@ fn test_close_position_profit_funded_by_pool() {
     let res = send_ix(&mut env.svm, close_ix, &[&env.trader]);
     assert!(res.is_ok(), "close_position failed: {:?}", res.err());
 
-    let expected_protocol_fee = 1_470u64;
-    let expected_lp_fee = 8_330u64;
-    let expected_vault_payout = 970_200u64;
-    let expected_debit_from_pool = 980_000u64;
-    let expected_total_payout = expected_vault_payout + expected_debit_from_pool; // 1_950_200
+    let expected_protocol_fee = 1_483u64;
+    let expected_lp_fee = 8_407u64;
+    let expected_vault_payout = 979_110u64;
+    let expected_debit_from_pool = 989_000u64;
+    let expected_total_payout = expected_vault_payout + expected_debit_from_pool; // 1_968_110
 
     // Trader receives exactly the total payout — not more (the bug would have
-    // added an extra 980_000 on top by also paying the full `payout` from the vault).
+    // added an extra 989_000 on top by also paying the full `payout` from the vault).
     assert_eq!(
         token_balance(&env.svm, &env.trader_usdc_ata) - trader_before,
         expected_total_payout
@@ -494,21 +496,11 @@ fn test_close_position_profit_funded_by_pool() {
 #[test]
 fn test_close_position_partial_loss_credits_pool() {
     let mut env = setup();
-    widen_market_caps(
-        &mut env.svm,
-        &env.market,
-        TvlScaledCaps {
-            max_position_notional: 1_000_000_000,
-            max_user_notional: 1_000_000_000,
-            max_oi_long: 1_000_000_000,
-            max_oi_short: 1_000_000_000,
-            max_skew: 20_000_000,
-        },
-    );
+    widen_caps_to(&mut env, 1_000_000_000);
     let open_price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
 
-    // margin=1_000_000, leverage=10 -> open fee 20_000, collateral 980_000,
-    // notional 9_800_000. Same math as the full-loss/profit tests above.
+    // margin=1_000_000, leverage=10 -> open fee 11_000, collateral 989_000,
+    // notional 9_890_000. Same math as the full-loss/profit tests above.
     let position = open(
         &mut env,
         open_price_update,
@@ -521,10 +513,10 @@ fn test_close_position_partial_loss_credits_pool() {
         },
     );
 
-    // close_fee = 9_800 -> protocol 1_470 / lp 8_330. collateral_after_fee = 970_200.
-    // -1% move: pnl = -1_000_000/100_000_000 * 9_800_000 = -98_000.
-    // net = 970_200 - 98_000 = 872_200 > 0 and < margin(970_200), so the trader gets
-    // paid 872_200 back AND the pool is credited the remaining 98_000.
+    // close_fee = 9_890 -> protocol 1_483 / lp 8_407. collateral_after_fee = 979_110.
+    // -1% move: pnl = -1_000_000/100_000_000 * 9_890_000 = -98_900.
+    // net = 979_110 - 98_900 = 880_210 > 0 and < margin(979_110), so the trader gets
+    // paid 880_210 back AND the pool is credited the remaining 98_900.
     let close_price_update = fabricate_price_update(&mut env.svm, 99_00_000_000); // $99.00
 
     let trader_before = token_balance(&env.svm, &env.trader_usdc_ata);
@@ -551,16 +543,16 @@ fn test_close_position_partial_loss_credits_pool() {
     let res = send_ix(&mut env.svm, close_ix, &[&env.trader]);
     assert!(res.is_ok(), "close_position failed: {:?}", res.err());
 
-    let expected_protocol_fee = 1_470u64;
-    let expected_lp_fee = 8_330u64;
-    let expected_payout = 872_200u64;
-    let expected_credit_to_pool = 98_000u64;
+    let expected_protocol_fee = 1_483u64;
+    let expected_lp_fee = 8_407u64;
+    let expected_payout = 880_210u64;
+    let expected_credit_to_pool = 98_900u64;
 
     assert_eq!(
         token_balance(&env.svm, &env.trader_usdc_ata) - trader_before,
         expected_payout
     );
-    // Vault drains by exactly the position's full collateral (980_000): fee split
+    // Vault drains by exactly the position's full collateral (989_000): fee split
     // (protocol + lp) + trader payout + pool credit, with nothing left over.
     assert_eq!(
         vault_before - token_balance(&env.svm, &env.market_vault),
@@ -589,18 +581,10 @@ fn test_close_position_partial_loss_credits_pool() {
 #[test]
 fn test_close_position_short_profit_funded_by_pool() {
     let mut env = setup();
-    widen_market_caps(
-        &mut env.svm,
-        &env.market,
-        TvlScaledCaps {
-            max_position_notional: 1_000_000_000,
-            max_user_notional: 1_000_000_000,
-            max_oi_long: 1_000_000_000,
-            max_oi_short: 1_000_000_000,
-            max_skew: 20_000_000,
-        },
-    );
-    // Seed the pool with enough liquidity to cover the payout below (980_000).
+    // Widen to 995_000_000 now so the extra 5_000_000 seeded by fund_pool below
+    // lands the tvl at open_position time on exactly 1_000_000_000.
+    widen_caps_to(&mut env, 995_000_000);
+    // Seed the pool with enough liquidity to cover the payout below (989_000).
     fund_pool(&mut env, 5_000_000);
 
     let open_price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
@@ -617,11 +601,11 @@ fn test_close_position_short_profit_funded_by_pool() {
     );
 
     // Same fee math as the long case (skew is symmetric for the first trade in an
-    // empty market): close_fee = 9_800 -> protocol 1_470 / lp 8_330,
-    // collateral_after_fee = 970_200.
-    // -10% move profits a short: pnl = +10_000_000/100_000_000 * 9_800_000 = +980_000.
-    // net = 970_200 + 980_000 = 1_950_200, exceeding collateral_after_fee, so
-    // debit_from_pool = 980_000 and the vault only pays its own 970_200 share.
+    // empty market): close_fee = 9_890 -> protocol 1_483 / lp 8_407,
+    // collateral_after_fee = 979_110.
+    // -10% move profits a short: pnl = +10_000_000/100_000_000 * 9_890_000 = +989_000.
+    // net = 979_110 + 989_000 = 1_968_110, exceeding collateral_after_fee, so
+    // debit_from_pool = 989_000 and the vault only pays its own 979_110 share.
     let close_price_update = fabricate_price_update(&mut env.svm, 90_00_000_000); // $90.00
 
     let trader_before = token_balance(&env.svm, &env.trader_usdc_ata);
@@ -648,11 +632,11 @@ fn test_close_position_short_profit_funded_by_pool() {
     let res = send_ix(&mut env.svm, close_ix, &[&env.trader]);
     assert!(res.is_ok(), "close_position failed: {:?}", res.err());
 
-    let expected_protocol_fee = 1_470u64;
-    let expected_lp_fee = 8_330u64;
-    let expected_vault_payout = 970_200u64;
-    let expected_debit_from_pool = 980_000u64;
-    let expected_total_payout = expected_vault_payout + expected_debit_from_pool; // 1_950_200
+    let expected_protocol_fee = 1_483u64;
+    let expected_lp_fee = 8_407u64;
+    let expected_vault_payout = 979_110u64;
+    let expected_debit_from_pool = 989_000u64;
+    let expected_total_payout = expected_vault_payout + expected_debit_from_pool; // 1_968_110
 
     assert_eq!(
         token_balance(&env.svm, &env.trader_usdc_ata) - trader_before,

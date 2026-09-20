@@ -27,10 +27,7 @@ use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use solana_signer::Signer;
 
 use perp::{
-    state::{
-        position::PositionType,
-        syntetic_market::{SynteticMarket, TvlScaledCaps},
-    },
+    state::{position::PositionType, syntetic_market::SynteticMarket},
     OpenPositionParams, SMParams,
 };
 
@@ -50,6 +47,7 @@ struct Env {
     insurance_fund_vault: Pubkey,
     lp_pool: Pubkey,
     lp_pool_usdc_vault: Pubkey,
+    lp_mint: Pubkey,
     usdc_mint: Pubkey,
     trader_usdc_ata: Pubkey,
     liquidator_usdc_ata: Pubkey,
@@ -128,7 +126,6 @@ fn setup() -> Env {
         market,
         market_vault,
         insurance_fund_vault,
-        lp_pool,
         oracle,
         usdc_mint,
         sym,
@@ -142,16 +139,18 @@ fn setup() -> Env {
 
     // Widen caps immediately: every liquidate test opens a large-enough position
     // to actually breach maintenance margin, well past the default seed-tvl caps.
-    widen_market_caps(
+    // See test_open_position.rs's `test_open_position_distributes_fees` for the
+    // full derivation: a tvl of 1_000_000_000 gives max_position_notional=
+    // 10_000_000, max_skew=200_000_000, max_oi_long/short=400_000_000.
+    widen_lp_pool_tvl(
         &mut svm,
-        &market,
-        TvlScaledCaps {
-            max_position_notional: 1_000_000_000,
-            max_user_notional: 1_000_000_000,
-            max_oi_long: 1_000_000_000,
-            max_oi_short: 1_000_000_000,
-            max_skew: 20_000_000,
-        },
+        &payer,
+        lp_program_id,
+        usdc_mint,
+        lp_pool,
+        lp_pool_usdc_vault,
+        lp_mint,
+        1_000_000_000,
     );
 
     // trader + liquidator + fee receiver ATAs
@@ -191,6 +190,7 @@ fn setup() -> Env {
         insurance_fund_vault,
         lp_pool,
         lp_pool_usdc_vault,
+        lp_mint,
         usdc_mint,
         trader_usdc_ata,
         liquidator_usdc_ata,
@@ -239,8 +239,8 @@ fn fund_insurance_fund(env: &mut Env, amount: u64) {
 
 // --- tests -------------------------------------------------------------------
 
-/// margin=1_000_000, leverage=10 -> open fee 20_000, collateral 980_000,
-/// notional 9_800_000 — same math as the close_position tests. Shared by every
+/// margin=1_000_000, leverage=10 -> open fee 11_000, collateral 989_000,
+/// notional 9_890_000 — same math as the close_position tests. Shared by every
 /// test below so the numbers are easy to cross-check.
 fn open_standard_long(env: &mut Env, price_update: Pubkey) -> Pubkey {
     open(
@@ -265,8 +265,8 @@ fn test_liquidate_rejects_healthy_position() {
     let open_price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
     let position = open_standard_long(&mut env, open_price_update);
 
-    // -1% move: pnl = -98_000, equity = 980_000 - 98_000 = 882_000, maintenance
-    // margin = 9_800_000 * 500bps = 490_000. equity(882_000) > margin(490_000),
+    // -1% move: pnl = -98_900, equity = 989_000 - 98_900 = 890_100, maintenance
+    // margin = 9_890_000 * 500bps = 494_500. equity(890_100) > margin(494_500),
     // so this position is nowhere near liquidatable.
     let bad_price_update = fabricate_price_update(&mut env.svm, 99_00_000_000); // $99.00
     let liquidate_ix = make_liquidate_ix(
@@ -274,6 +274,7 @@ fn test_liquidate_rejects_healthy_position() {
         env.liquidator.pubkey(),
         env.trader.pubkey(),
         bad_price_update,
+        env.global_config,
         position,
         env.market_vault,
         env.insurance_fund_vault,
@@ -297,9 +298,9 @@ fn test_liquidate_normal_splits_penalty_50_50() {
     let open_price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
     let position = open_standard_long(&mut env, open_price_update);
 
-    // pnl = -8_000_000/100_000_000 * 9_800_000 = -784_000.
-    // equity = 980_000 - 784_000 = 196_000. maintenance_margin = 490_000.
-    // equity(196_000) <= margin(490_000) and > 0 -> normal liquidation.
+    // pnl = -8_000_000/100_000_000 * 9_890_000 = -791_200.
+    // equity = 989_000 - 791_200 = 197_800. maintenance_margin = 494_500.
+    // equity(197_800) <= margin(494_500) and > 0 -> normal liquidation.
     let liq_price_update = fabricate_price_update(&mut env.svm, 92_00_000_000); // $92.00
 
     let vault_before = token_balance(&env.svm, &env.market_vault);
@@ -311,6 +312,7 @@ fn test_liquidate_normal_splits_penalty_50_50() {
         env.liquidator.pubkey(),
         env.trader.pubkey(),
         liq_price_update,
+        env.global_config,
         position,
         env.market_vault,
         env.insurance_fund_vault,
@@ -321,9 +323,9 @@ fn test_liquidate_normal_splits_penalty_50_50() {
     let res = send_ix(&mut env.svm, liquidate_ix, &[&env.liquidator]);
     assert!(res.is_ok(), "liquidate failed: {:?}", res.err());
 
-    let expected_penalty = 196_000u64;
-    let expected_liquidator_cut = 98_000u64;
-    let expected_insurance_cut = 98_000u64;
+    let expected_penalty = 197_800u64;
+    let expected_liquidator_cut = 98_900u64;
+    let expected_insurance_cut = 98_900u64;
 
     assert_eq!(
         token_balance(&env.svm, &env.liquidator_usdc_ata) - liquidator_before,
@@ -363,8 +365,8 @@ fn test_liquidate_bad_debt_pays_keeper_from_insurance_fund() {
     let open_price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00
     let position = open_standard_long(&mut env, open_price_update);
 
-    // pnl = -15_000_000/100_000_000 * 9_800_000 = -1_470_000.
-    // equity = 980_000 - 1_470_000 = -490_000 <= 0 -> bad debt branch.
+    // pnl = -15_000_000/100_000_000 * 9_890_000 = -1_483_500.
+    // equity = 989_000 - 1_483_500 = -494_500 <= 0 -> bad debt branch.
     let liq_price_update = fabricate_price_update(&mut env.svm, 85_00_000_000); // $85.00
 
     let vault_before = token_balance(&env.svm, &env.market_vault);
@@ -376,6 +378,7 @@ fn test_liquidate_bad_debt_pays_keeper_from_insurance_fund() {
         env.liquidator.pubkey(),
         env.trader.pubkey(),
         liq_price_update,
+        env.global_config,
         position,
         env.market_vault,
         env.insurance_fund_vault,
@@ -386,8 +389,8 @@ fn test_liquidate_bad_debt_pays_keeper_from_insurance_fund() {
     let res = send_ix(&mut env.svm, liquidate_ix, &[&env.liquidator]);
     assert!(res.is_ok(), "liquidate failed: {:?}", res.err());
 
-    // reward = notional(9_800_000) * BAD_DEBT_KEEPER_REWARD_BPS(10) / 10_000 = 9_800.
-    let expected_reward = 9_800u64;
+    // reward = notional(9_890_000) * BAD_DEBT_KEEPER_REWARD_BPS(10) / 10_000 = 9_890.
+    let expected_reward = 9_890u64;
 
     assert_eq!(
         token_balance(&env.svm, &env.liquidator_usdc_ata) - liquidator_before,
@@ -428,7 +431,7 @@ fn test_liquidate_short_position() {
         },
     );
 
-    // +8% move is a loss for a short: pnl = (100e6-108e6)*9_800_000/100e6 = -784_000.
+    // +8% move is a loss for a short: pnl = (100e6-108e6)*9_890_000/100e6 = -791_200.
     // Same equity/penalty numbers as the long normal-liquidation test.
     let liq_price_update = fabricate_price_update(&mut env.svm, 108_00_000_000); // $108.00
 
@@ -440,6 +443,7 @@ fn test_liquidate_short_position() {
         env.liquidator.pubkey(),
         env.trader.pubkey(),
         liq_price_update,
+        env.global_config,
         position,
         env.market_vault,
         env.insurance_fund_vault,
@@ -450,8 +454,8 @@ fn test_liquidate_short_position() {
     let res = send_ix(&mut env.svm, liquidate_ix, &[&env.liquidator]);
     assert!(res.is_ok(), "liquidate failed: {:?}", res.err());
 
-    let expected_liquidator_cut = 98_000u64;
-    let expected_insurance_cut = 98_000u64;
+    let expected_liquidator_cut = 98_900u64;
+    let expected_insurance_cut = 98_900u64;
 
     assert_eq!(
         token_balance(&env.svm, &env.liquidator_usdc_ata) - liquidator_before,
@@ -495,6 +499,7 @@ fn test_liquidate_allows_any_keeper() {
         random_keeper.pubkey(),
         env.trader.pubkey(),
         liq_price_update,
+        env.global_config,
         position,
         env.market_vault,
         env.insurance_fund_vault,
@@ -504,5 +509,5 @@ fn test_liquidate_allows_any_keeper() {
     );
     let res = send_ix(&mut env.svm, liquidate_ix, &[&random_keeper]);
     assert!(res.is_ok(), "liquidate failed: {:?}", res.err());
-    assert_eq!(token_balance(&env.svm, &keeper_usdc_ata), 98_000);
+    assert_eq!(token_balance(&env.svm, &keeper_usdc_ata), 98_900);
 }

@@ -15,7 +15,7 @@ pub use instructions::*;
 pub use oracle::*;
 pub use state::*;
 
-declare_id!("CAGSKds76Qs517jdCukru48RUwxAb5KpNGH68zVLSK6G");
+declare_id!("GLXcF2ceqnp1eyEnKCw5wcFsB8S5qRjW8nXD7omDsSpY");
 
 #[program]
 pub mod perp {

@@ -35,7 +35,7 @@ use solana_signer::Signer;
 use perp::{
     state::{
         position::{Position, PositionType},
-        syntetic_market::{SynteticMarket, TvlScaledCaps},
+        syntetic_market::SynteticMarket,
     },
     OpenPositionParams, SMParams,
 };
@@ -46,6 +46,7 @@ use common::*;
 
 struct Env {
     svm: LiteSVM,
+    payer: Keypair,
     trader: Keypair,
     program_id: Pubkey,
     lp_program_id: Pubkey,
@@ -54,6 +55,7 @@ struct Env {
     market_vault: Pubkey,
     lp_pool: Pubkey,
     lp_pool_usdc_vault: Pubkey,
+    lp_mint: Pubkey,
     usdc_mint: Pubkey,
     trader_usdc_ata: Pubkey,
     fee_receiver_ata: Pubkey,
@@ -133,7 +135,6 @@ fn setup() -> Env {
         market,
         market_vault,
         insurance_fund_vault,
-        lp_pool,
         oracle,
         usdc_mint,
         sym,
@@ -167,6 +168,7 @@ fn setup() -> Env {
 
     Env {
         svm,
+        payer,
         trader,
         program_id,
         lp_program_id,
@@ -175,6 +177,7 @@ fn setup() -> Env {
         market_vault,
         lp_pool,
         lp_pool_usdc_vault,
+        lp_mint,
         usdc_mint,
         trader_usdc_ata,
         fee_receiver_ata,
@@ -189,9 +192,10 @@ fn test_open_position_ok() {
     let price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00 @ -8 exponent
 
     let position = position_pda(&env.program_id, &env.trader.pubkey(), &env.market);
-    // Market caps are derived from initialize_market's hardcoded mock_lp_tvl = 50_000
-    // (MicroUsdc), which makes max_position_notional a tiny 500 MicroUsdc — so these
-    // amounts are deliberately small to stay under cap, not representative USDC sizes.
+    // Market caps are derived live from lp_pool.total_assets, seeded at 50_000
+    // (MicroUsdc) in setup(), which makes max_position_notional a tiny 500
+    // MicroUsdc — so these amounts are deliberately small to stay under cap,
+    // not representative USDC sizes.
     let params = OpenPositionParams {
         leverage: 4,
         margin: 100,
@@ -275,25 +279,31 @@ fn test_open_position_ok() {
 #[test]
 fn test_open_position_distributes_fees() {
     let mut env = setup();
-    widen_market_caps(
+    // Widen the live TVL-derived caps (utils::caps) so this trade actually
+    // produces a non-zero fee. Caps scale off a single lp_pool.total_assets by
+    // fixed ratios (max_skew = 20x max_position_notional, max_oi = 40x), so
+    // they can't be set independently like the old stored per-market caps —
+    // a tvl of 1_000_000_000 gives max_position_notional=10_000_000,
+    // max_skew=200_000_000, max_oi_long/short=400_000_000.
+    widen_lp_pool_tvl(
         &mut env.svm,
-        &env.market,
-        TvlScaledCaps {
-            max_position_notional: 1_000_000_000,
-            max_user_notional: 1_000_000_000,
-            max_oi_long: 1_000_000_000,
-            max_oi_short: 1_000_000_000,
-            max_skew: 20_000_000, // small relative to notional below, so skew_fee also kicks in
-        },
+        &env.payer,
+        env.lp_program_id,
+        env.usdc_mint,
+        env.lp_pool,
+        env.lp_pool_usdc_vault,
+        env.lp_mint,
+        1_000_000_000,
     );
     let price_update = fabricate_price_update(&mut env.svm, 100_00_000_000); // $100.00 @ -8 exponent
 
     let position = position_pda(&env.program_id, &env.trader.pubkey(), &env.market);
-    // margin=1_000_000 (1 USDC), leverage=10 -> notional_before_fee=10_000_000.
-    // base_fee = 10bps of 10_000_000 = 10_000. Skew goes 0 -> 10_000_000 against a
-    // 20_000_000 cap (worsens_skew=true), so skew_fee = 10_000_000/20_000_000 * 20bps
-    // of notional = 10bps of 10_000_000 = 10_000. total fee = 20_000.
-    // protocol_fees = 15% of 20_000 = 3_000, lp_fees = 17_000.
+    // margin=1_000_000 (1 USDC), leverage=10 -> notional_before_fee=10_000_000
+    // (== max_position_notional, right at the cap so skew_fee is meaningful).
+    // base_fee = 10bps of 10_000_000 = 10_000. Skew goes 0 -> 10_000_000 against
+    // a 200_000_000 cap (worsens_skew=true), so skew_fee = 10_000_000/200_000_000
+    // * 20bps of notional = 1bps of 10_000_000 = 1_000. total fee = 11_000.
+    // protocol_fees = 15% of 11_000 = 1_650, lp_fees = 9_350.
     let params = OpenPositionParams {
         leverage: 10,
         margin: 1_000_000,
@@ -302,9 +312,9 @@ fn test_open_position_distributes_fees() {
         position_type: PositionType::Long,
     };
     let margin = params.margin;
-    let expected_fee = 20_000u64;
-    let expected_protocol_fee = 3_000u64;
-    let expected_lp_fee = 17_000u64;
+    let expected_fee = 11_000u64;
+    let expected_protocol_fee = 1_650u64;
+    let expected_lp_fee = 9_350u64;
     let expected_collateral = margin - expected_fee;
 
     let trader_ata_before = token_balance(&env.svm, &env.trader_usdc_ata);

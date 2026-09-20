@@ -23,7 +23,7 @@ use solana_keypair::Keypair;
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use solana_signer::Signer;
 
-use perp::state::syntetic_market::{SynteticMarket, TvlScaledCaps};
+use perp::state::syntetic_market::SynteticMarket;
 
 use common::*;
 
@@ -32,6 +32,7 @@ struct Env {
     payer: Keypair,
     program_id: Pubkey,
     market: Pubkey,
+    lp_pool: Pubkey,
 }
 
 fn setup() -> Env {
@@ -83,7 +84,6 @@ fn setup() -> Env {
         market,
         vault,
         insurance_fund_vault,
-        lp_pool,
         oracle,
         usdc_mint,
         sym,
@@ -91,18 +91,18 @@ fn setup() -> Env {
     );
     send_ix(&mut svm, init_market_ix, &[&payer]).unwrap();
 
-    // update_funding's skew_ratio_bps needs a nonzero max_skew; a fresh market
-    // with no LP deposit seeds it at 0 (see test_update_caps.rs).
-    widen_market_caps(
+    // update_funding's skew_ratio_bps needs a nonzero max_skew, which is derived
+    // live from lp_pool.total_assets; a target of 2_500 gives max_skew = 500
+    // (20% of TVL), matching what tests below were written against.
+    widen_lp_pool_tvl(
         &mut svm,
-        &market,
-        TvlScaledCaps {
-            max_position_notional: 1_000_000_000,
-            max_user_notional: 1_000_000_000,
-            max_oi_long: 1_000_000_000,
-            max_oi_short: 1_000_000_000,
-            max_skew: 500,
-        },
+        &payer,
+        lp_program_id,
+        usdc_mint,
+        lp_pool,
+        lp_pool_usdc_vault,
+        lp_mint,
+        2_500,
     );
 
     Env {
@@ -110,6 +110,7 @@ fn setup() -> Env {
         payer,
         program_id,
         market,
+        lp_pool,
     }
 }
 
@@ -125,7 +126,7 @@ fn market_state(env: &Env) -> SynteticMarket {
 fn test_update_funding_rejects_too_early() {
     let mut env = setup();
 
-    let ix = make_update_funding_ix(env.program_id, env.payer.pubkey(), env.market);
+    let ix = make_update_funding_ix(env.program_id, env.payer.pubkey(), env.market, env.lp_pool);
     let res = send_ix(&mut env.svm, ix, &[&env.payer]);
     assert!(res.is_err(), "funding update before interval should fail");
 
@@ -145,7 +146,7 @@ fn test_update_funding_computes_and_clamps_positive_rate() {
     set_market_oi(&mut env.svm, &env.market, 1_250_000, 500_000);
     warp_clock_to(&mut env.svm, 3_600);
 
-    let ix = make_update_funding_ix(env.program_id, env.payer.pubkey(), env.market);
+    let ix = make_update_funding_ix(env.program_id, env.payer.pubkey(), env.market, env.lp_pool);
     let res = send_ix(&mut env.svm, ix, &[&env.payer]);
     assert!(res.is_ok(), "update_funding failed: {:?}", res.err());
 
@@ -163,7 +164,7 @@ fn test_update_funding_computes_negative_rate_for_short_skew() {
     set_market_oi(&mut env.svm, &env.market, 500_000, 1_250_000);
     warp_clock_to(&mut env.svm, 3_600);
 
-    let ix = make_update_funding_ix(env.program_id, env.payer.pubkey(), env.market);
+    let ix = make_update_funding_ix(env.program_id, env.payer.pubkey(), env.market, env.lp_pool);
     let res = send_ix(&mut env.svm, ix, &[&env.payer]);
     assert!(res.is_ok(), "update_funding failed: {:?}", res.err());
 
@@ -179,14 +180,14 @@ fn test_update_funding_accumulates_across_calls() {
     set_market_oi(&mut env.svm, &env.market, 1_250_000, 500_000);
 
     warp_clock_to(&mut env.svm, 3_600);
-    let ix = make_update_funding_ix(env.program_id, env.payer.pubkey(), env.market);
+    let ix = make_update_funding_ix(env.program_id, env.payer.pubkey(), env.market, env.lp_pool);
     send_ix(&mut env.svm, ix, &[&env.payer]).unwrap();
 
     warp_clock_to(&mut env.svm, 7_200);
     // Same instruction + accounts as the first call: without a fresh blockhash
     // this produces an identical signature, which LiteSVM rejects as a replay.
     env.svm.expire_blockhash();
-    let ix = make_update_funding_ix(env.program_id, env.payer.pubkey(), env.market);
+    let ix = make_update_funding_ix(env.program_id, env.payer.pubkey(), env.market, env.lp_pool);
     let res = send_ix(&mut env.svm, ix, &[&env.payer]);
     assert!(res.is_ok(), "second update_funding failed: {:?}", res.err());
 
@@ -209,7 +210,7 @@ fn test_update_funding_allows_any_signer() {
         .airdrop(&random_keeper.pubkey(), LAMPORTS_PER_SOL)
         .unwrap();
 
-    let ix = make_update_funding_ix(env.program_id, random_keeper.pubkey(), env.market);
+    let ix = make_update_funding_ix(env.program_id, random_keeper.pubkey(), env.market, env.lp_pool);
     let res = send_ix(&mut env.svm, ix, &[&random_keeper]);
     assert!(res.is_ok(), "update_funding failed: {:?}", res.err());
 

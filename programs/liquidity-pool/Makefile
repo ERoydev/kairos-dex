@@ -2,6 +2,13 @@
 build:
 	anchor build
 
+# Cleans everything so i can start with new program_id, used when i want to redeploy on clean state
+# Before using this first use solana program close on the old one
+rebuild:
+	rm -rf target
+	anchor keys sync
+	anchor build
+
 build-devnet:
 	anchor build -- --features dev
 

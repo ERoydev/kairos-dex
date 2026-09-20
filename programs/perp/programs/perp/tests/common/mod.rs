@@ -150,6 +150,35 @@ pub fn seed_lp_pool(
     assert!(res.is_ok(), "lp pool deposit failed: {:?}", res.err());
 }
 
+/// Tops up the LP pool's `total_assets` to `target` (no-op if already there),
+/// so a test can bump the live TVL-derived caps (`utils::caps`) to a known
+/// value regardless of whatever `setup()` already deposited.
+#[allow(clippy::too_many_arguments)]
+pub fn widen_lp_pool_tvl(
+    svm: &mut LiteSVM,
+    payer: &Keypair,
+    lp_program_id: Pubkey,
+    usdc_mint: Pubkey,
+    lp_pool: Pubkey,
+    lp_pool_usdc_vault: Pubkey,
+    lp_mint: Pubkey,
+    target: u64,
+) {
+    let current = pool_total_assets(svm, &lp_pool);
+    if target > current {
+        seed_lp_pool(
+            svm,
+            payer,
+            lp_program_id,
+            usdc_mint,
+            lp_pool,
+            lp_pool_usdc_vault,
+            lp_mint,
+            target - current,
+        );
+    }
+}
+
 // --- PDA helpers -----------------------------------------------------------
 
 pub fn global_config_pda(program_id: &Pubkey) -> Pubkey {
@@ -412,6 +441,7 @@ pub fn make_liquidate_ix(
     liquidator: Pubkey,
     trader: Pubkey,
     price_update: Pubkey,
+    global_config: Pubkey,
     position: Pubkey,
     market_vault: Pubkey,
     insurance_fund_vault: Pubkey,
@@ -426,6 +456,7 @@ pub fn make_liquidate_ix(
             liquidator,
             trader,
             price_update,
+            global_config,
             position,
             market_vault,
             insurance_fund_vault,
@@ -438,13 +469,19 @@ pub fn make_liquidate_ix(
     )
 }
 
-pub fn make_update_funding_ix(program_id: Pubkey, signer: Pubkey, market: Pubkey) -> Instruction {
+pub fn make_update_funding_ix(
+    program_id: Pubkey,
+    signer: Pubkey,
+    market: Pubkey,
+    lp_pool: Pubkey,
+) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
         &perp::instruction::UpdateFunding {}.data(),
         perp::accounts::UpdateFunding {
             signer,
             market,
+            lp_pool,
             system_program: system_program::ID,
         }
         .to_account_metas(None),
