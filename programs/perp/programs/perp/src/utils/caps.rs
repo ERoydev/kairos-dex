@@ -8,6 +8,7 @@ const MAX_SKEW_BPS: u64 = 2_000; // 20% of TVL
 
 /// Used on Market initialization
 pub fn compute_caps(lp_tvl: MicroUsdc) -> TvlScaledCaps {
+    // ANCHOR: The problem is that these values are computed once on initialize market, so after initialization lp_tvl changes and these value should change too
     TvlScaledCaps {
         max_position_notional: scale(lp_tvl, MAX_POSITION_NOTIONAL_BPS),
         max_user_notional: scale(lp_tvl, MAX_USER_NOTIONAL_BPS),
@@ -16,6 +17,8 @@ pub fn compute_caps(lp_tvl: MicroUsdc) -> TvlScaledCaps {
         max_skew: scale(lp_tvl, MAX_SKEW_BPS),
     }
 }
+
+
 
 fn scale(tvl: MicroUsdc, bps: u64) -> MicroUsdc {
     (tvl as u128 * bps as u128 / 10_000) as u64

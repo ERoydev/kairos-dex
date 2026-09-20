@@ -30,3 +30,13 @@ init-global-devnet:
 
 init-market-devnet:
 	surfpool run init-market --env devnet --unsupervised
+
+open-position-devnet:
+	npx tsx scripts/ts/open_position_normal.ts
+
+# fee receiver must be initialized, before creating a position
+initialize-fee-receiver:
+	npx tsx scripts/ts/initialize_fee_receiver.ts
+
+deposit-usdc-lp:
+	npx tsx scripts/ts/deposit_usdc_in_lp.ts

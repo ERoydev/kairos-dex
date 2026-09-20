@@ -8,7 +8,7 @@ import BN from "bn.js";
 import {
   payer,
   lpProgram,
-  lpPool,
+  lpPoolPda,
   lpUsdcVault,
   lpMint,
   USDC_MINT,
@@ -29,7 +29,7 @@ async function main() {
     .deposit(new BN(DEPOSIT_AMOUNT))
     .accounts({
       provider: payer.publicKey,
-      pool: lpPool,
+      pool: lpPoolPda,
       providerAta,
       providerLpAta,
       usdcMint: USDC_MINT,
@@ -44,7 +44,7 @@ async function main() {
   console.log("tx signature:", sig);
   console.log(explorer(sig));
 
-  const pool = await lpProgram.account.pool.fetch(lpPool);
+  const pool = await lpProgram.account.pool.fetch(lpPoolPda);
   console.log("pool after deposit:", pool);
 }
 

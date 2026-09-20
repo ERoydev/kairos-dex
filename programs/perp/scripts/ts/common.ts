@@ -19,17 +19,6 @@ export const RPC_URL = process.env.RPC_URL ?? "https://api.devnet.solana.com";
 export const USDC_MINT = new PublicKey(
   process.env.USDC_MINT ?? "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
 );
-// Feed used in the program's own open_position.rs test (read_live_oracle_price) —
-// already validated to publish with exponent -8, matching PYTH_PRICE_EXPONENT.
-export const FEED_ID_HEX =
-  process.env.PYTH_FEED_ID_HEX ??
-  "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43";
-// Pyth's own keeper continuously updates this canonical price-feed PDA on devnet
-// (shard 0) for the feed above, so we can read it directly without posting updates
-// ourselves. Derived via PythSolanaReceiver.getPriceFeedAccountAddress(0, FEED_ID_HEX).
-export const PYTH_PRICE_FEED = new PublicKey(
-  process.env.PYTH_PRICE_FEED_ACCOUNT ?? "4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo",
-);
 // Separate from the trader/payer wallet — open_position/close_position pass
 // fee_receiver_ata and trader_usdc_ata as distinct accounts, and Anchor rejects
 // the same mutable account being passed under two different names.
@@ -50,14 +39,14 @@ anchor.setProvider(provider);
 const perpIdl = require("../../target/idl/perp.json");
 const lpIdl = require("../../../liquidity-pool/target/idl/liquidity_pool.json");
 
-export const perpProgram = new Program(perpIdl as anchor.Idl, provider) as unknown as Program<Perp>;
-export const lpProgram = new Program(lpIdl as anchor.Idl, provider) as unknown as Program<LiquidityPool>;
+export const perpProgram: anchor.Program<Perp> = new Program(perpIdl as anchor.Idl, provider) as unknown as Program<Perp>;
+export const lpProgram: anchor.Program<LiquidityPool> = new Program(lpIdl as anchor.Idl, provider) as unknown as Program<LiquidityPool>;
 
 export const [globalConfig] = PublicKey.findProgramAddressSync(
   [Buffer.from("global")],
   perpProgram.programId,
 );
-export const [lpPool] = PublicKey.findProgramAddressSync(
+export const [lpPoolPda] = PublicKey.findProgramAddressSync(
   [Buffer.from("liquidity_pool")],
   lpProgram.programId,
 );
@@ -101,10 +90,10 @@ export function symbolToBytes16(symbol: string): number[] {
   return Array.from(buf);
 }
 
-export const symbolBytes = symbolToBytes16(SYMBOL);
-export const market = marketPda(Buffer.from(symbolBytes));
-export const marketVault = marketVaultPda(market);
-export const insuranceFundVault = insuranceFundVaultPda(market);
+// export const symbolBytes = symbolToBytes16(SYMBOL);
+// export const market = marketPda(Buffer.from(symbolBytes));
+// export const marketVault = marketVaultPda(market);
+// export const insuranceFundVault = insuranceFundVaultPda(market);
 
 export function explorer(sig: string) {
   return `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
@@ -116,21 +105,23 @@ export function explorer(sig: string) {
 // instructions (open_position/close_position/liquidate), instead of guessing.
 const PRICE_UPDATE_PUBLISH_TIME_OFFSET = 8 + 32 + 1 + 32 + 8 + 8 + 4; // disc + write_authority + verification_level + feed_id + price + conf + exponent
 
-export async function pythPriceAgeSeconds(): Promise<number> {
+export async function pythPriceAgeSeconds(PYTH_PRICE_FEED: PublicKey): Promise<number> {
   const info = await connection.getAccountInfo(PYTH_PRICE_FEED);
   if (!info) throw new Error(`PYTH_PRICE_FEED account not found: ${PYTH_PRICE_FEED.toBase58()}`);
   const publishTime = info.data.readBigInt64LE(PRICE_UPDATE_PUBLISH_TIME_OFFSET);
   return Math.floor(Date.now() / 1000) - Number(publishTime);
 }
 
+/// Wait for fresh oracle, before sending tx so we can avoid oracle staleness errors
 export async function waitForFreshOracle(
+  PYTH_PRICE_FEED: PublicKey,
   maxAgeSecs = 45,
   pollIntervalMs = 15_000,
   maxWaitMs = 40 * 60_000,
 ): Promise<void> {
   const deadline = Date.now() + maxWaitMs;
   for (;;) {
-    const age = await pythPriceAgeSeconds();
+    const age = await pythPriceAgeSeconds(PYTH_PRICE_FEED);
     if (age <= maxAgeSecs) {
       console.log(`oracle fresh (${age}s old), proceeding`);
       return;
