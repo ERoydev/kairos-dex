@@ -7,7 +7,7 @@ build:
 rebuild:
 	rm -rf target
 	anchor keys sync
-	anchor build
+	anchor build -- --features dev
 
 build-devnet:
 	anchor build -- --features dev

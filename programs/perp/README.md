@@ -38,6 +38,9 @@ sign to close them once the program is gone.
 
 ## Deploy
 
+1. Deploy the liquidity pool, but make sure `txtx.yml` has the correct perp program input variable.
+2. Then build the perp program and deploy.
+
 ```bash
 anchor build
 surfpool run deployment --env devnet -u
