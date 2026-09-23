@@ -1,10 +1,12 @@
 pub mod catch_up_worker;
 pub mod config;
 pub mod cursor_manager;
+pub mod queue_publisher;
 
 pub use catch_up_worker::*;
 pub use config::*;
 pub use cursor_manager::*;
+pub use queue_publisher::*;
 
 #[tokio::main]
 async fn main() {
@@ -16,7 +18,9 @@ async fn main() {
     Config::from_env().init();
     let db = kairos_db::create_pool(&config::get().database_url).await;
 
-    let start_up_catch_up_worker: StartUpCatchUpWorker = StartUpCatchUpWorker::new(db);
+    let queue_publisher = QueuePublisher::new();
+
+    StartUpCatchUpWorker::new(db, &queue_publisher).run().await;
 
     println!("Hello, world!");
 }

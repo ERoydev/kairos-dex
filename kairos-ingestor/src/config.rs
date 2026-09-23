@@ -2,6 +2,7 @@ use std::env;
 use std::sync::OnceLock;
 
 #[allow(unused)]
+#[derive(Debug, Clone)]
 pub struct Config {
     pub rpc_url: String,
     pub database_url: String,
