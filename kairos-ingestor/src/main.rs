@@ -3,12 +3,15 @@ pub mod config;
 pub mod cursor_manager;
 pub mod error;
 pub mod queue_publisher;
+pub mod stream;
 
 pub use catch_up_worker::*;
 pub use config::*;
 pub use cursor_manager::*;
 pub use error::*;
 pub use queue_publisher::*;
+pub use stream::*;
+use solana_client::nonblocking::rpc_client::RpcClient;
 
 #[tokio::main]
 async fn main() {
