@@ -9,54 +9,64 @@ use solana_client::{
 };
 use solana_sdk::{pubkey::Pubkey, signature::Signature};
 
-use crate::{Cursor, CursorManager, Error, QueuePublisher, Result, config};
+use crate::{Cursor, CursorManager, Error, QueuePublisher, Result};
 
 /// StartUp Mechanism: make sure no events are missed between "where i stopped last time" and "now".
 /// Cursor exists → fetch from cursor → now.
 /// Cursor is empty (first run) → apply first-run policy (start from now, or backfill all).
 pub struct StartUpCatchUpWorker<'a> {
     pub cursor_manager: CursorManager,
-    pub rpc_client: RpcClient,
+    pub rpc_client: &'a RpcClient,
     pub queue_publisher: &'a QueuePublisher,
 }
 
 impl<'a> StartUpCatchUpWorker<'a> {
-    pub fn new(db: DatabaseConnection, queue_publisher: &'a QueuePublisher) -> Self {
-        let rpc = RpcClient::new(config::get().rpc_url.clone());
-
+    pub fn new(
+        db: DatabaseConnection,
+        queue_publisher: &'a QueuePublisher,
+        rpc_client: &'a RpcClient,
+    ) -> Self {
         StartUpCatchUpWorker {
             cursor_manager: CursorManager::new(db),
-            rpc_client: rpc,
+            rpc_client,
             queue_publisher,
         }
     }
 
-    pub async fn run(&self) {
-        // Runs everything
-    }
-
-    pub async fn dispatch(&self) -> Result<()> {
-        let program_ids = Vec::new();
+    pub async fn run(&self) -> Result<()> {
+        let program_ids = Vec::new(); // TODO
         let cursors = self.cursor_manager.load(program_ids).await;
+        tracing::info!(count = cursors.len(), "StartUpCatchUpWorker starting");
+
         for (program_id, cursor) in cursors {
             let p_id = Pubkey::from_str(&program_id)?;
             match cursor {
                 // cursor exists — fetch everything since the last known signature
                 Cursor::Existing(model) => {
+                    tracing::info!(
+                        program_id = %program_id,
+                        since = %model.last_signature,
+                        "resuming from cursor"
+                    );
                     let until = model.last_signature.parse()?;
                     self.fetch_signatures(&p_id, Some(until)).await?;
                 }
                 // first run — no stop point, walk all the way back to genesis
                 Cursor::Empty(_) => {
+                    tracing::info!(program_id = %program_id, "no cursor found, backfilling from genesis");
                     self.fetch_signatures(&p_id, None).await?;
                 }
             }
+            tracing::info!(program_id = %program_id, "caught up program");
         }
+
+        tracing::info!("StartUpCatchUpWorker finished");
         Ok(())
     }
 
     async fn fetch_signatures(&self, program_id: &Pubkey, until: Option<Signature>) -> Result<()> {
         let mut before: Option<Signature> = None;
+        let mut total = 0usize;
 
         loop {
             let sigs = self
@@ -70,11 +80,18 @@ impl<'a> StartUpCatchUpWorker<'a> {
                         ..Default::default()
                     },
                 )
-                .await?;
+                .await
+                .inspect_err(|err| {
+                    tracing::error!(program_id = %program_id, %err, "failed to fetch signatures");
+                })?;
 
             if sigs.is_empty() {
+                tracing::debug!(program_id = %program_id, "no more signatures to backfill");
                 break;
             }
+
+            total += sigs.len();
+            tracing::debug!(program_id = %program_id, batch_size = sigs.len(), total, "fetched signature batch");
 
             before = Some(
                 sigs.last()
@@ -89,6 +106,8 @@ impl<'a> StartUpCatchUpWorker<'a> {
                 self.queue_publisher.publish(program_id, signature).await;
             }
         }
+
+        tracing::info!(program_id = %program_id, total, "backfill complete for program");
         Ok(())
     }
 }

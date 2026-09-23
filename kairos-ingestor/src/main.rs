@@ -20,9 +20,16 @@ async fn main() {
     Config::from_env().init();
     let db = kairos_db::create_pool(&config::get().database_url).await;
 
-    let queue_publisher = QueuePublisher::new();
+    let rpc_client = RpcClient::new(config::get().rpc_http_url.clone());
 
-    StartUpCatchUpWorker::new(db, &queue_publisher).run().await;
+    let program_ids =
+        config::load_devnet_program_ids().expect("failed to load deployed program ids");
+    let queue_publisher = QueuePublisher::new(program_ids);
+
+    // TODO maybe is good idea to implement retry mechanism if this fails
+    let _ = StartUpCatchUpWorker::new(db, &queue_publisher, &rpc_client)
+        .run()
+        .await;
 
     println!("Hello, world!");
 }

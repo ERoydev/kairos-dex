@@ -35,5 +35,10 @@ impl CursorManager {
         cursor_data
     }
 
-    pub fn update(&self, program_id: String, sig: String) {}
+    pub fn update(&self, program_id: String, sig: String) {
+        println!(
+            "Indexer called update! Program_id: {}, signature: {}",
+            program_id, sig
+        );
+    }
 }

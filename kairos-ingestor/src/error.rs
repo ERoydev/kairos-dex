@@ -24,6 +24,8 @@ pub enum Error {
     ParsePubkey(ParsePubkeyError),
     #[from]
     ParseSignatureError(ParseSignatureError),
+    #[from]
+    Json(serde_json::Error),
 }
 
 // region:    --- Custom
