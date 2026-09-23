@@ -11,7 +11,7 @@ pub use events::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("6yxEJYRsMSc1FuzLoWDWpfrDWPvmGH34kFD9qPFiPTHy");
+declare_id!("2iUndtrz2hE9LC83r8ykP8wwC4gwxwHPY5uqPx3ow1Pu");
 
 #[program]
 pub mod liquidity_pool {

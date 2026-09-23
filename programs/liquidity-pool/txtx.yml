@@ -17,4 +17,4 @@ environments:
 
       # initialize_pool args
       usdc_mint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"  # devnet USDC mint (same one used in scripts/ts/common.ts)
-      perp_program_id: "Ha7eXehmxwvsNXi8qAZWo63JRccYQm3Me6MJu6ewaRwS"  # deployed perp program id (devnet)
+      perp_program_id: "6wzUqro2DfvoedUCorQzP2wyLRSUd9PQcvs4gmT7B72X"  # deployed perp program id (devnet)
