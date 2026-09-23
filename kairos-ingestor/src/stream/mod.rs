@@ -1,3 +1,4 @@
+pub mod decoder;
 pub mod health;
 pub mod stream_subscriber;
 

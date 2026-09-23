@@ -5,8 +5,10 @@ edition = "2024"
 
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
 dotenv = "0.15.0"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version="0.30.0", features = ["native-tls"] }
+futures-util = "0.3.34"
 # Solana
 solana-sdk = { version = "4.1.0", features = ["full"] }
 solana-client = "4.3.0"
@@ -19,6 +21,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 kairos-db = { path = "../kairos-db" }
+anchor-client = "1.1.2"
+perp = { path = "../programs/perp/programs/perp", features = ["no-entrypoint"] }
+liquidity-pool = { path = "../programs/liquidity-pool/programs/liquidity-pool", features = ["no-entrypoint"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 

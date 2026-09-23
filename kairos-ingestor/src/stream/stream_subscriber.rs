@@ -7,7 +7,11 @@ use solana_sdk::pubkey::Pubkey;
 use tokio::time::{interval, sleep};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-use crate::{config, health::HealthState};
+use crate::{
+    config,
+    decoder::{decode_lp_events, decode_perp_events},
+    health::HealthState,
+};
 
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
@@ -105,30 +109,22 @@ impl Subscriber {
                     match message? {
                         Message::Text(text) => match self.kind {
                             ProgramKind::Perp => {
-                                // for decoded in parse_message(&text) {
-                                    
-                                // }
-                                //     if let Some(db) = &self.db {
-                                //         handlers::dispatch(decoded, db, self.rpc.as_ref()).await;
-                                //     } else {
-                                //         println!("Decoded event: {decoded:?}");
-                                //     }
-                                //     if let Some(health_state) = &self.health_state {
-                                //         health_state.mark_event_processed();
-                                //     }
-                                // }
+                                let program_id_str = self.program_id.to_string();
+                                for event in decode_perp_events(&program_id_str, &text) {
+                                    println!("Decoded event: {event:?}");
+                                    if let Some(health_state) = &self.health_state {
+                                        health_state.mark_event_processed();
+                                    }
+                                }
                             }
                             ProgramKind::LpPool => {
-                                // for decoded in lp::parse_message(&text) {
-                                //     if let Some(db) = &self.db {
-                                //         handlers::dispatch_lp(decoded, db, self.rpc.as_ref()).await;
-                                //     } else {
-                                //         println!("Decoded LP event: {decoded:?}");
-                                //     }
-                                //     if let Some(health_state) = &self.health_state {
-                                //         health_state.mark_event_processed();
-                                //     }
-                                // }
+                                let program_id_str = self.program_id.to_string();
+                                for event in decode_lp_events(&program_id_str, &text) {
+                                    println!("Decoded LP event: {event:?}");
+                                    if let Some(health_state) = &self.health_state {
+                                        health_state.mark_event_processed();
+                                    }
+                                }
                             }
                         },
                         Message::Ping(payload) => write.send(Message::Pong(payload)).await?,

@@ -10,8 +10,8 @@ pub use config::*;
 pub use cursor_manager::*;
 pub use error::*;
 pub use queue_publisher::*;
-pub use stream::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
+pub use stream::*;
 
 #[tokio::main]
 async fn main() {
