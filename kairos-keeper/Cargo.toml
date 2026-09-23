@@ -16,6 +16,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rpc = { package = "kairos-rpc", path = "../kairos-rpc" }
 kairos-db = { path = "../kairos-db" }
+kairos-config = { path = "../kairos-config" }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 # Smart Contract Tx dependencies

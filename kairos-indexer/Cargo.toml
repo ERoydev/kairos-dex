@@ -28,6 +28,7 @@ chrono = "0.4"
 
 # Internal
 kairos-db = { path = "../kairos-db" }
+kairos-config = { path = "../kairos-config" }
 migration = { path = "../kairos-db/migration" }
 perp = { path = "../programs/perp/programs/perp", features = ["no-entrypoint"] }
 liquidity-pool = { path = "../programs/liquidity-pool/programs/liquidity-pool", features = ["no-entrypoint"] }

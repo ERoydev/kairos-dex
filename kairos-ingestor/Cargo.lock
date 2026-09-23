@@ -2852,6 +2852,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "kairos-config"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "solana-sdk",
+]
+
+[[package]]
 name = "kairos-db"
 version = "0.1.0"
 dependencies = [
@@ -2872,6 +2880,7 @@ dependencies = [
  "derive_more",
  "dotenv",
  "futures-util",
+ "kairos-config",
  "kairos-db",
  "liquidity-pool",
  "migration",
