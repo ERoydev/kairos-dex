@@ -5,6 +5,7 @@ mod m20260826_000002_create_markets;
 mod m20260826_000003_create_position_events;
 mod m20260826_000004_create_funding_updates;
 mod m20260826_000005_create_lp_pool;
+mod m20260921_144507_ingestor_cursor;
 
 pub struct Migrator;
 
@@ -17,7 +18,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260826_000002_create_markets::Migration),
             Box::new(m20260826_000003_create_position_events::Migration),
             Box::new(m20260826_000004_create_funding_updates::Migration),
-            Box::new(m20260826_000005_create_lp_pool::Migration)
+            Box::new(m20260826_000005_create_lp_pool::Migration),
+            Box::new(m20260921_144507_ingestor_cursor::Migration),
         ]
         
     }

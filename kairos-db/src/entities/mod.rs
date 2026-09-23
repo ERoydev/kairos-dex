@@ -3,6 +3,7 @@
 pub mod prelude;
 
 pub mod funding_updates;
+pub mod ingestor_cursor;
 pub mod lp_events;
 pub mod lp_pool;
 pub mod markets;

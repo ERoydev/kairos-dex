@@ -63,7 +63,7 @@ sea-orm-cli migrate up -u postgres://user:pass@localhost:5432/kairos_indexer
 ```bash
 sea-orm-cli generate entity \
   -u postgres://user:pass@localhost:5432/kairos_indexer \
-  -o src/db/entities \
+  -o src/entities \
   --with-serde both
 ```
 5. I can use that entity model in my rust indexer code
