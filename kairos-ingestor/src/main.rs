@@ -1,11 +1,13 @@
 pub mod catch_up_worker;
 pub mod config;
 pub mod cursor_manager;
+pub mod error;
 pub mod queue_publisher;
 
 pub use catch_up_worker::*;
 pub use config::*;
 pub use cursor_manager::*;
+pub use error::*;
 pub use queue_publisher::*;
 
 #[tokio::main]
