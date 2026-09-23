@@ -24,6 +24,9 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
+    tracing_subscriber::fmt()
+    .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+    .init();
 
     let config = Config::default();
 
@@ -41,7 +44,7 @@ async fn main() {
         .with_state(health_state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("Listening on http://localhost:3000");
+    tracing::info!("=====> Listening on port: 0.0.0.0:3000");
 
     // Both subscribers hit the same RPC URL — share one client so they share its connection
     // pool instead of each opening their own.

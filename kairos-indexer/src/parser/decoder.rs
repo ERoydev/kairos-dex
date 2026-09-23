@@ -3,7 +3,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use borsh::BorshDeserialize;
 
 use crate::parser::events::{
-    AnchorEvent, CapsUpdated, FundingUpdated, GlobalInitialized, GlobalUpdated, MarketInitialized,
+    AnchorEvent, FundingUpdated, GlobalInitialized, GlobalUpdated, MarketInitialized,
     MarketPaused, PerpEvent, PositionClosed, PositionLiquidated, PositionOpened,
 };
 use crate::parser::notification::{LogsNotification, PROGRAM_DATA_PREFIX};
@@ -91,7 +91,6 @@ fn decode_event(encoded: &str) -> Result<PerpEvent, DecodeError> {
     try_decode!(GlobalUpdated, GlobalUpdated);
     try_decode!(MarketInitialized, MarketInitialized);
     try_decode!(MarketPaused, MarketPaused);
-    try_decode!(CapsUpdated, CapsUpdated);
     try_decode!(FundingUpdated, FundingUpdated);
     try_decode!(PositionOpened, PositionOpened);
     try_decode!(PositionClosed, PositionClosed);

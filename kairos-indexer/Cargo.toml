@@ -19,6 +19,8 @@ borsh = { version = "1", features = ["derive"] }
 base64 = "0.22"
 chrono = "0.4"
 migration = { path = "../kairos-db/migration" }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 # kairos-rpc
 rpc = { package = "kairos-rpc", path = "../kairos-rpc" }

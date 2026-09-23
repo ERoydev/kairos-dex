@@ -39,7 +39,6 @@ pub async fn dispatch(decoded: DecodedEvent, db: &DatabaseConnection, rpc: Optio
         }
         PerpEvent::MarketInitialized(e) => markets::market_initialized(db, rpc, e).await,
         PerpEvent::MarketPaused(e) => markets::market_paused(db, e).await,
-        PerpEvent::CapsUpdated(_)
         | PerpEvent::GlobalInitialized(_)
         | PerpEvent::GlobalUpdated(_) => Ok(()),
     };
@@ -58,7 +57,6 @@ fn perp_event_name(event: &PerpEvent) -> &'static str {
         PerpEvent::FundingUpdated(_) => "FundingUpdated",
         PerpEvent::MarketInitialized(_) => "MarketInitialized",
         PerpEvent::MarketPaused(_) => "MarketPaused",
-        PerpEvent::CapsUpdated(_) => "CapsUpdated",
         PerpEvent::GlobalInitialized(_) => "GlobalInitialized",
         PerpEvent::GlobalUpdated(_) => "GlobalUpdated",
     }
