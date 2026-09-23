@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Deposited {
     pub pool: Pubkey,
     pub provider: Pubkey,
@@ -9,6 +10,7 @@ pub struct Deposited {
 }
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Withdrawn {
     pub pool: Pubkey,
     pub provider: Pubkey,
@@ -17,6 +19,7 @@ pub struct Withdrawn {
 }
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Credited {
     pub pool: Pubkey,
     pub caller: Pubkey,
@@ -24,6 +27,7 @@ pub struct Credited {
 }
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Debited {
     pub pool: Pubkey,
     pub destination: Pubkey,
