@@ -25,8 +25,7 @@ async fn main() {
 
     let rpc_client = RpcClient::new(config::get().rpc_http_url.clone());
 
-    let program_ids =
-        config::load_devnet_program_ids().expect("failed to load deployed program ids");
+    let program_ids = config::load_devnet_program_ids();
     let queue_publisher = QueuePublisher::new(program_ids);
 
     // TODO maybe is good idea to implement retry mechanism if this fails
