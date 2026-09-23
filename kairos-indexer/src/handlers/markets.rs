@@ -1,10 +1,10 @@
+use perp::events::*;
+use perp::syntetic_market::SynteticMarket;
 use sea_orm::{DatabaseConnection, DbErr, Set};
+use solana_client::nonblocking::rpc_client::RpcClient;
 
 use crate::db::entities::markets;
 use crate::db::queries;
-use crate::parser::accounts::SynteticMarket;
-use crate::parser::events::{MarketInitialized, MarketPaused};
-use rpc::RpcClient;
 
 pub async fn market_initialized(
     db: &DatabaseConnection,
@@ -27,7 +27,9 @@ pub async fn market_initialized(
         db,
         markets::ActiveModel {
             market_pubkey: Set(e.market.to_string()),
-            symbol: Set(e.symbol_str()),
+            symbol: Set(String::from_utf8_lossy(&e.symbol)
+                .trim_end_matches('\0')
+                .to_string()),
             oracle: Set(oracle),
             interval_seconds: Set(interval_seconds),
             ..Default::default()

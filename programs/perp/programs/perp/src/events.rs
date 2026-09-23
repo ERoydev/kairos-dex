@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use crate::alliases::MicroUsdc;
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MarketInitialized {
     pub market: Pubkey,
     pub symbol: [u8; 16],
@@ -10,6 +11,7 @@ pub struct MarketInitialized {
 }
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GlobalInitialized {
     pub authority: Pubkey,
     pub fee_receiver: Pubkey,
@@ -17,6 +19,7 @@ pub struct GlobalInitialized {
 }
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GlobalUpdated {
     pub authority: Pubkey,
     pub new_fee_receiver: Option<Pubkey>,
@@ -25,6 +28,7 @@ pub struct GlobalUpdated {
 }
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MarketPaused {
     pub market: Pubkey,
     pub authority: Pubkey,
@@ -32,6 +36,7 @@ pub struct MarketPaused {
 }
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FundingUpdated {
     pub market: Pubkey,
     pub funding_rate_bps: i64,
@@ -40,6 +45,7 @@ pub struct FundingUpdated {
 }
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PositionOpened {
     pub market: Pubkey,
     pub position: Pubkey,
@@ -49,6 +55,7 @@ pub struct PositionOpened {
 }
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PositionClosed {
     pub market: Pubkey,
     pub position: Pubkey,
@@ -59,6 +66,7 @@ pub struct PositionClosed {
 }
 
 #[event]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PositionLiquidated {
     pub market: Pubkey,
     pub position: Pubkey,

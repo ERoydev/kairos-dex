@@ -3,7 +3,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, Set,
 };
 
-use crate::entities::{funding_updates, lp_events, lp_pool, markets, position_events, positions};
+use crate::{entities::{funding_updates, lp_events, lp_pool, markets, position_events, positions}, ingestor_cursor};
 
 pub async fn find_position(
     db: &DatabaseConnection,
@@ -187,4 +187,16 @@ pub async fn upsert_lp_pool(
         }
     }
     Ok(())
+}
+
+/// Resume point for a given program's ingestion — everything up to this signature/slot is
+/// already processed and pushed to the queue.
+pub async fn load_cursor(
+    db: &DatabaseConnection,
+    program_id: &str,
+) -> Result<Option<ingestor_cursor::Model>, DbErr> {
+    ingestor_cursor::Entity::find()
+        .filter(ingestor_cursor::Column::ProgramId.eq(program_id))
+        .one(db)
+        .await
 }

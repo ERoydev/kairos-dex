@@ -13,8 +13,8 @@ use axum::{Router, routing::get};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::DatabaseConnection;
 
-use kairos_indexer::health::{HealthState, health_handler};
 use kairos_indexer::*;
+use solana_client::nonblocking::rpc_client::RpcClient;
 
 struct AppState {
     pub db_pool: DatabaseConnection,
@@ -24,6 +24,9 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     let config = Config::default();
 
@@ -34,38 +37,14 @@ async fn main() {
 
     let state = Arc::new(AppState { db_pool, config });
 
-    let health_state = Arc::new(HealthState::new());
-
-    let app = Router::new()
-        .route("/health", get(health_handler))
-        .with_state(health_state.clone());
+    let app = Router::new();
+    // .route("/health", get(health_handler))
+    // .with_state(health_state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("Listening on http://localhost:3000");
+    tracing::info!("=====> Listening on port: 0.0.0.0:3000");
 
-    // Both subscribers hit the same RPC URL — share one client so they share its connection
-    // pool instead of each opening their own.
-    let rpc_client = rpc::RpcClient::new(&state.config.rpc_http_url);
-
-    Subscriber::new(
-        &state.config.rpc_ws_url,
-        state.config.program_id.to_string(),
-        ProgramKind::Perp,
-    )
-    .with_health_state(health_state.clone())
-    .with_db(state.db_pool.clone())
-    .with_rpc(rpc_client.clone())
-    .spawn();
-
-    Subscriber::new(
-        &state.config.rpc_ws_url,
-        state.config.lp_pool_program_id.to_string(),
-        ProgramKind::LpPool,
-    )
-    .with_health_state(health_state)
-    .with_db(state.db_pool.clone())
-    .with_rpc(rpc_client)
-    .spawn();
+    let rpc_client = RpcClient::new(state.config.rpc_http_url.clone()); // TODO connection to redis client instead
 
     axum::serve(listener, app).await.unwrap();
 }

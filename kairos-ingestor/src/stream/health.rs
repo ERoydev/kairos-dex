@@ -2,11 +2,12 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use axum::{Json, extract::State, http::StatusCode};
+use reqwest::StatusCode;
 use serde_json::json;
 
 const STALE_AFTER_SECS: i64 = 60;
 
+#[derive(Debug)]
 pub struct HealthState {
     connected: AtomicBool,
     last_event_at: AtomicI64,
@@ -46,9 +47,7 @@ fn now() -> i64 {
         .as_secs() as i64
 }
 
-pub async fn health_handler(
-    State(state): State<Arc<HealthState>>,
-) -> (StatusCode, Json<serde_json::Value>) {
+pub async fn health_handler(state: Arc<HealthState>) -> (StatusCode, String) {
     let connected = state.connected.load(Ordering::Relaxed);
     let last_event_at = state.last_event_at.load(Ordering::Relaxed);
     let stale = last_event_at != 0 && now() - last_event_at > STALE_AFTER_SECS;
@@ -65,5 +64,5 @@ pub async fn health_handler(
     } else {
         StatusCode::SERVICE_UNAVAILABLE
     };
-    (status, Json(body))
+    (status, body.to_string())
 }

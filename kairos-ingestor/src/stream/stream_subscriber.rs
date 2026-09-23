@@ -2,16 +2,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
-use sea_orm::DatabaseConnection;
 use serde_json::json;
+use solana_sdk::pubkey::Pubkey;
 use tokio::time::{interval, sleep};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-use crate::handlers;
-use crate::health::HealthState;
-use crate::parser::lp;
-use crate::parser::parse_message;
-use rpc::RpcClient;
+use crate::{
+    config,
+    decoder::{decode_lp_events, decode_perp_events},
+    health::HealthState,
+};
 
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
@@ -28,41 +28,23 @@ pub enum ProgramKind {
 /// Not a reliant way for prod after all — in prod this DEX will use either a paid service or a Geyser plugin.
 pub struct Subscriber {
     rpc_ws_url: String,
-    program_id: String,
+    program_id: Pubkey,
     kind: ProgramKind,
     health_state: Option<Arc<HealthState>>,
-    db: Option<DatabaseConnection>,
-    rpc: Option<RpcClient>,
 }
 
 impl Subscriber {
-    pub fn new(
-        rpc_ws_url: impl Into<String>,
-        program_id: impl Into<String>,
-        kind: ProgramKind,
-    ) -> Self {
+    pub fn new(program_id: Pubkey, kind: ProgramKind) -> Self {
         Self {
-            rpc_ws_url: rpc_ws_url.into(),
-            program_id: program_id.into(),
+            rpc_ws_url: config::get().rpc_ws_url.clone(),
+            program_id,
             kind,
             health_state: None,
-            db: None,
-            rpc: None,
         }
     }
 
     pub fn with_health_state(mut self, health_state: Arc<HealthState>) -> Self {
         self.health_state = Some(health_state);
-        self
-    }
-
-    pub fn with_db(mut self, db: DatabaseConnection) -> Self {
-        self.db = Some(db);
-        self
-    }
-
-    pub fn with_rpc(mut self, rpc: RpcClient) -> Self {
-        self.rpc = Some(rpc);
         self
     }
 
@@ -127,24 +109,18 @@ impl Subscriber {
                     match message? {
                         Message::Text(text) => match self.kind {
                             ProgramKind::Perp => {
-                                for decoded in parse_message(&text) {
-                                    if let Some(db) = &self.db {
-                                        handlers::dispatch(decoded, db, self.rpc.as_ref()).await;
-                                    } else {
-                                        println!("Decoded event: {decoded:?}");
-                                    }
+                                let program_id_str = self.program_id.to_string();
+                                for event in decode_perp_events(&program_id_str, &text) {
+                                    println!("Decoded event: {event:?}");
                                     if let Some(health_state) = &self.health_state {
                                         health_state.mark_event_processed();
                                     }
                                 }
                             }
                             ProgramKind::LpPool => {
-                                for decoded in lp::parse_message(&text) {
-                                    if let Some(db) = &self.db {
-                                        handlers::dispatch_lp(decoded, db, self.rpc.as_ref()).await;
-                                    } else {
-                                        println!("Decoded LP event: {decoded:?}");
-                                    }
+                                let program_id_str = self.program_id.to_string();
+                                for event in decode_lp_events(&program_id_str, &text) {
+                                    println!("Decoded LP event: {event:?}");
                                     if let Some(health_state) = &self.health_state {
                                         health_state.mark_event_processed();
                                     }

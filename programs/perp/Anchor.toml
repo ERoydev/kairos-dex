@@ -7,7 +7,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-perp = "GLXcF2ceqnp1eyEnKCw5wcFsB8S5qRjW8nXD7omDsSpY"
+perp = "6wzUqro2DfvoedUCorQzP2wyLRSUd9PQcvs4gmT7B72X"
 
 [provider]
 cluster = "localnet"
