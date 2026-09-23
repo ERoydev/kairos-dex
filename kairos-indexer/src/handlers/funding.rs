@@ -1,10 +1,10 @@
+use perp::events::FundingUpdated;
+use perp::syntetic_market::SynteticMarket;
 use sea_orm::{DatabaseConnection, DbErr, Set};
+use solana_client::nonblocking::rpc_client::RpcClient;
 
 use crate::db::entities::funding_updates;
 use crate::db::queries;
-use crate::parser::accounts::SynteticMarket;
-use crate::parser::events::FundingUpdated;
-use rpc::RpcClient;
 
 pub async fn funding_updated(
     db: &DatabaseConnection,

@@ -1,11 +1,10 @@
+use liquidity_pool::{Pool, events::*};
 use sea_orm::{DatabaseConnection, DbErr, Set};
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 
 use crate::db::entities::lp_events;
 use crate::db::queries;
-use crate::parser::lp::accounts::Pool;
-use crate::parser::lp::events::{Credited, Debited, Deposited, Withdrawn};
-use rpc::RpcClient;
 
 pub async fn deposited(
     db: &DatabaseConnection,

@@ -1,11 +1,11 @@
 use chrono::Utc;
+use perp::events::*;
+use perp::state::position::{Position, PositionType};
 use sea_orm::{DatabaseConnection, DbErr, Set};
+use solana_client::nonblocking::rpc_client::RpcClient;
 
 use crate::db::entities::{position_events, positions};
 use crate::db::queries;
-use crate::parser::accounts::Position as PositionAccount;
-use crate::parser::events::{PositionClosed, PositionLiquidated, PositionOpened};
-use rpc::RpcClient;
 
 pub async fn position_opened(
     db: &DatabaseConnection,
@@ -24,9 +24,12 @@ pub async fn position_opened(
     // fall back to a placeholder if that fails for any reason (see `fetch_account`).
     // TODO: Maybe is good idea to add these in the event, so i can skip fetching
     let (side, collateral, notional) =
-        match super::fetch_account::<PositionAccount>(rpc, &e.position, "position_opened").await {
+        match super::fetch_account::<Position>(rpc, &e.position, "position_opened").await {
             Some(account) => (
-                account.side.as_str().to_string(),
+                match account.side {
+                    PositionType::Long => "long".to_string(),
+                    PositionType::Short => "short".to_string(),
+                },
                 account.collateral as i64,
                 account.notional as i64,
             ),
